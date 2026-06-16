@@ -1,0 +1,6 @@
+arch_type: xs
+dataset_name: kitti
+freeze_encoder: false
+lr: 0.001
+pretrained_ckpt: null
+weight_decay: 0.01

@@ -1,0 +1,11 @@
+{
+    "RMSE": 0.7708932354631575,
+    "AbsRel": 0.2046166282910455,
+    "Delta1": 0.6854966110915078,
+    "train_time_sec": 0.0,
+    "eval_time_sec": 20.469305992126465,
+    "checkpoint": "/Volumes/Lexar/CV-project-25-26/models/checkpoints/finetune/best-epoch=31-val_delta1=0.0000-nyu-xxs.ckpt",
+    "variant": "lejepa",
+    "dataset": "nyu",
+    "arch": "xxs"
+}

@@ -1,0 +1,8 @@
+arch_type: xxs
+proj_dim: 64
+num_slices: 256
+lamb: 0.02
+alpha: 0.5
+lr: 0.005
+weight_decay: 0.05
+warmup_epochs: 10

@@ -1,0 +1,8 @@
+arch_type: s
+dataset: nyu
+lamb: 0.05
+lr: 0.0005
+num_slices: 256
+proj_dim: 64
+warmup_epochs: 10
+weight_decay: 0.05

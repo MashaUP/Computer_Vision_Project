@@ -1,0 +1,11 @@
+{
+    "RMSE": 0.8268629835608639,
+    "AbsRel": 0.18307669672565555,
+    "Delta1": 0.7182980842742884,
+    "train_time_sec": 0.0,
+    "eval_time_sec": 8.514410257339478,
+    "checkpoint": "C:\\Users\\andre\\Desktop\\CV-project-25-26\\models\\checkpoints\\finetune_nyu\\best-epoch=42-val_rmse=0.7589-nyu-s.ckpt",
+    "variant": "lejepa",
+    "dataset": "nyu",
+    "arch": "s"
+}

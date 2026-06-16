@@ -1,0 +1,11 @@
+{
+    "RMSE": 4.87579847434138,
+    "AbsRel": 0.12087731046976898,
+    "Delta1": 0.8449945078058188,
+    "train_time_sec": 0.0,
+    "eval_time_sec": 19.910258293151855,
+    "checkpoint": "/Volumes/Lexar/CV-project-25-26/models/checkpoints/finetune/best-epoch=56-val_delta1=0.0000-kitti-xxs.ckpt",
+    "variant": "lejepa",
+    "dataset": "kitti",
+    "arch": "xxs"
+}

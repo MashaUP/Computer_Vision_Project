@@ -1,0 +1,9 @@
+Dataset,Variant,RMSE,AbsRel,Delta1,Params (M),Latency (ms),Train time (s)
+NYU,Paper (Papa et al. 2024),0.5800,0.1740,0.7440,0.71,-,-
+KITTI,Paper (Papa et al. 2024),5.1570,0.1560,0.7820,0.71,-,-
+NYU,LeJEPA-METER,0.7709,0.2046,0.6855,0.71,13.00,-
+NYU,Random init,0.8575,0.2287,0.6462,0.71,13.00,-
+KITTI,LeJEPA-METER,4.8758,0.1209,0.8450,0.71,15.24,-
+KITTI,Random init,4.9876,0.1232,0.8427,0.71,15.24,-
+NYU,Δ (LeJEPA − Random init),-0.0866,-0.0241,+0.0392,-,-,-
+KITTI,Δ (LeJEPA − Random init),-0.1118,-0.0024,+0.0023,-,-,-

@@ -1,0 +1,11 @@
+{
+    "RMSE": 0.8574771660702788,
+    "AbsRel": 0.22871126162812336,
+    "Delta1": 0.6462470687044225,
+    "train_time_sec": 0.0,
+    "eval_time_sec": 3.4015369415283203,
+    "checkpoint": "/Volumes/Lexar/CV-project-25-26/models/checkpoints/supervised/best-epoch=36-val_delta1=0.0000-nyu-xxs.ckpt",
+    "variant": "from_scratch",
+    "dataset": "nyu",
+    "arch": "xxs"
+}

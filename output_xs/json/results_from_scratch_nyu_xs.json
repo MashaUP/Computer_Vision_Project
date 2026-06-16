@@ -1,0 +1,11 @@
+{
+    "RMSE": 0.8627895629900798,
+    "AbsRel": 0.19961921550110912,
+    "Delta1": 0.6864174881645495,
+    "train_time_sec": 0.0,
+    "eval_time_sec": 5.4245285987854,
+    "checkpoint": "C:\\Users\\andre\\Desktop\\CV-project-25-26\\models\\checkpoints\\finetune_from_scratch_nyu\\best-epoch=49-val_rmse=0.8042-nyu-xs.ckpt",
+    "variant": "from_scratch",
+    "dataset": "nyu",
+    "arch": "xs"
+}

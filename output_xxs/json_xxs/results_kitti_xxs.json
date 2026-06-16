@@ -1,0 +1,21 @@
+{
+    "arch": "xxs",
+    "dataset": "kitti",
+    "epochs": 60,
+    "ssl_pretrained": true,
+    "freeze_encoder": false,
+    "test/loss_step": 3.6455235481262207,
+    "test/l1_step": 2.213423252105713,
+    "test/ssim_step": 0.020998656749725342,
+    "test/normal_step": 0.5050803422927856,
+    "test/grad_step": 0.9060211181640625,
+    "test/loss_epoch": 3.417647123336792,
+    "test/l1_epoch": 2.196194887161255,
+    "test/ssim_epoch": 0.017867879942059517,
+    "test/normal_epoch": 0.11971895396709442,
+    "test/grad_epoch": 1.0838662385940552,
+    "test/rmse_kitti": 4.418666839599609,
+    "test/abs_rel_kitti": 0.11181370168924332,
+    "test/delta1_kitti": 0.8689940571784973,
+    "test/l1_kitti": 2.196194887161255
+}
