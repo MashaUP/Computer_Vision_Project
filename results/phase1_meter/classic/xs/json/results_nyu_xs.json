@@ -1,0 +1,21 @@
+{
+    "arch": "xs",
+    "dataset": "nyu",
+    "epochs": 60,
+    "ssl_pretrained": true,
+    "freeze_encoder": false,
+    "test/loss_step": 133.16001892089844,
+    "test/l1_step": 48.11858367919922,
+    "test/ssim_step": 8.798742294311523,
+    "test/normal_step": 55.73905563354492,
+    "test/grad_step": 20.503631591796875,
+    "test/loss_epoch": 151.65367126464844,
+    "test/l1_epoch": 57.1324348449707,
+    "test/ssim_epoch": 9.964914321899414,
+    "test/normal_epoch": 56.07755661010742,
+    "test/grad_epoch": 28.478769302368164,
+    "test/rmse_nyu": 0.7902048826217651,
+    "test/abs_rel_nyu": 0.1920735388994217,
+    "test/delta1_nyu": 0.6963832974433899,
+    "test/l1_nyu": 57.1324462890625
+}

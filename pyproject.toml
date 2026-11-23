@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lean-geometry"
+version = "0.2.0"
+description = "LeJEPA self-supervised pre-training of lightweight monocular depth encoders (FlexDepth, ZipDepth, BoRe-Depth, METER) on NYU Depth V2 and KITTI."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Andrea Masciarelli" }, { name = "Luca Zualdi" }]
+# torch / torchvision are installed separately, from the wheel index that matches the GPU:
+# cu126 for Pascal (GTX 1080 / 1080 Ti, PyTorch <= 2.14), cu130 for newer GPUs. See docker/Dockerfile.
+dependencies = [
+    "lejepa @ git+https://github.com/galilai-group/lejepa.git@c293d29",
+    "numpy",
+    "scipy",
+    "einops",
+    "timm",
+    "pyyaml",
+    "h5py",
+    "opencv-python-headless",
+    "matplotlib",
+    "scikit-learn",
+    "pytest",
+]
+
+# Code runs from the repository root (no installed package): `pip install .` only installs the dependencies.
+[tool.setuptools]
+packages = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::FutureWarning:timm.*"]

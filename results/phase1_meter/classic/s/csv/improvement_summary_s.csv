@@ -1,0 +1,7 @@
+Dataset,Metric,Random init,LeJEPA,Δ abs,Δ relative,Verdict
+NYU,RMSE,0.9039,0.8269,+0.0771,++8.53%,✅ LeJEPA helps
+NYU,AbsRel,0.2189,0.1831,+0.0358,++16.35%,✅ LeJEPA helps
+NYU,Delta1,0.6435,0.7183,+0.0748,++11.63%,✅ LeJEPA helps
+KITTI,RMSE,4.8266,4.8044,+0.0222,++0.46%,≈ tied
+KITTI,AbsRel,0.1163,0.1279,-0.0116,-9.99%,⚠️  LeJEPA hurts
+KITTI,Delta1,0.8617,0.8408,-0.0210,-2.43%,⚠️  LeJEPA hurts

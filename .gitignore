@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Never in git: datasets, runs, checkpoints, caches (they live under /mnt/hdd2/<user>/ on the lab machine)
+/data_local/
+/runs/
+/cache/
+/wandb/
+*.ckpt
+*.pth
+*.pt
+*.h5
+*.mat
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

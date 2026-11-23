@@ -1,0 +1,25 @@
+# LeJEPA dense, METER recipe (phase-1 dense branch): protocol default.
+# Same as dense_phase1 except that crops and colour augmentation are drawn per image
+# (phase 1 drew one set of parameters for the whole batch).
+variant: dense
+lambd: 0.02
+alpha: 0.5              # weight of the global invariance term (1 - alpha on the dense term)
+grid: 4                 # 4x4 token grid on the deepest map
+n_global: 2             # 1 global crop x 2 colour views
+global_size: 256
+global_scale: [0.3, 1.0]
+n_local: 6              # 3 local crops x 2 colour views
+local_size: 128
+local_scale: [0.05, 0.3]
+solarize_p: 0.2
+shared_batch_aug: false
+proj_dims: [256, 512, 64]
+proj_norm: layernorm
+num_slices: 256
+epps_points: 21
+epps_t_max: 5.0
+lr: 5.0e-3
+weight_decay: 5.0e-2
+epochs: 50
+warmup_epochs: 10
+eta_min_ratio: 1.0e-3

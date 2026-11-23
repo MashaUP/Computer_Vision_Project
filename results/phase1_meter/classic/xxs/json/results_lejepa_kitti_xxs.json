@@ -1,0 +1,11 @@
+{
+    "RMSE": 4.502957594103459,
+    "AbsRel": 0.11301405598536135,
+    "Delta1": 0.8706262018213142,
+    "train_time_sec": 0.0,
+    "eval_time_sec": 35.723060607910156,
+    "checkpoint": "C:\\Users\\andre\\Desktop\\CV-project-25-26\\models\\checkpoints\\finetune_kitti\\best-epoch=23-val_rmse=4.3770-kitti-xxs.ckpt",
+    "variant": "lejepa",
+    "dataset": "kitti",
+    "arch": "xxs"
+}

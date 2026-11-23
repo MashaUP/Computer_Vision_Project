@@ -1,0 +1,13 @@
+# Example: LeJEPA dense pre-training of the FlexDepth-Nano encoder on NYU raw frames.
+# Copy and edit for every run (one file per model x variant x dataset). Paths are relative to the data root.
+task: pretrain
+name: pretrain_flexdepth_nyu_dense
+model: flexdepth
+variant: n
+dataset: nyu
+recipe: dense               # classic | dense (protocol) | classic_phase1 | dense_phase1
+train_list: splits/nyu_raw_train_frames.txt
+image_size: [288, 384]      # frames are resized to this before the views are cropped
+batch_size: 64
+num_workers: 4
+seed: 0

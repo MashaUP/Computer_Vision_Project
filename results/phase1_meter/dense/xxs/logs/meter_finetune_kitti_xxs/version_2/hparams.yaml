@@ -1,0 +1,10 @@
+arch_type: xxs
+lr_enc: 0.001
+lr_dec: 0.001
+weight_decay: 0.01
+pretrained_ckpt: /content/drive/MyDrive/CV-project-25-26/models/checkpoints/pretrain/last.ckpt
+freeze_encoder: false
+use_baseline: false
+dataset: nyu
+warmup_epochs: 5
+use_step_lr: true

@@ -1,0 +1,7 @@
+Dataset,Variant,RMSE,AbsRel,Delta1,Params (M),Latency (ms),Train time (s)
+NYU,LeJEPA-METER,0.8269,0.1831,0.7183,3.30,7.10,-
+NYU,Random init,0.9039,0.2189,0.6435,3.30,7.10,-
+KITTI,LeJEPA-METER,4.8044,0.1279,0.8408,3.30,7.24,-
+KITTI,Random init,4.8266,0.1163,0.8617,3.30,7.24,-
+NYU,Δ (LeJEPA − Random init),-0.0771,-0.0358,+0.0748,-,-,-
+KITTI,Δ (LeJEPA − Random init),-0.0222,+0.0116,-0.0210,-,-,-

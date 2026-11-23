@@ -1,0 +1,9 @@
+[submodule "sota/flexdepth"]
+	path = sota/flexdepth
+	url = https://github.com/startnew/flexdepth
+[submodule "sota/zipdepth"]
+	path = sota/zipdepth
+	url = https://github.com/fabiotosi92/ZipDepth
+[submodule "sota/bore_depth"]
+	path = sota/bore_depth
+	url = https://github.com/liangxiansheng093/BoRe-Depth

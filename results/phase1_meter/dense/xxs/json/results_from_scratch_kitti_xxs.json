@@ -1,0 +1,11 @@
+{
+    "RMSE": 4.98755727726336,
+    "AbsRel": 0.12323880085899391,
+    "Delta1": 0.8427443394996287,
+    "train_time_sec": 0.0,
+    "eval_time_sec": 6.643599033355713,
+    "checkpoint": "/Volumes/Lexar/CV-project-25-26/models/checkpoints/supervised/best-epoch=36-val_delta1=0.0000-kitti-xxs.ckpt",
+    "variant": "from_scratch",
+    "dataset": "kitti",
+    "arch": "xxs"
+}

@@ -1,0 +1,6 @@
+arch_type: s
+dataset_name: nyu
+freeze_encoder: false
+lr: 0.001
+pretrained_ckpt: C:\Users\andre\Desktop\CV-project-25-26\models\checkpoints\ssl_nyu\last.ckpt
+weight_decay: 0.01

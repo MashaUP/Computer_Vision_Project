@@ -1,0 +1,22 @@
+# LeJEPA classic, official recipe (galilai-group/lejepa README and paper): protocol default.
+variant: classic
+lambd: 0.05             # loss = lambd * SIGReg + (1 - lambd) * invariance
+n_global: 2
+global_size: 224
+global_scale: [0.3, 1.0]
+n_local: 6
+local_size: 98          # METER needs view sizes divisible by 32 (use classic_phase1 sizes for it)
+local_scale: [0.05, 0.3]
+solarize_p: 0.2
+proj_dims: [2048, 2048, 512]
+proj_norm: batchnorm
+centre: global          # paper: invariance to the centre of the global views
+sigreg_input: per_view
+num_slices: 1024
+epps_points: 17
+epps_t_max: null        # library default
+lr: 5.0e-4
+weight_decay: 5.0e-4    # official value for CNN encoders
+epochs: 50
+warmup_epochs: 10
+eta_min_ratio: 1.0e-3
