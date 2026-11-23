@@ -20,10 +20,16 @@ so LeJEPA gains are compared **within** each model, not across models.
 2. **LeJEPA pre-training** of the encoder on the deepest map (stride 32), on unlabelled frames of
    NYU raw / KITTI raw with the test scenes excluded, one pre-training per dataset:
    - classic: official recipe, [`configs/lejepa/classic.yaml`](../configs/lejepa/classic.yaml);
-   - dense: METER recipe (lambda 0.02, lr 5e-3, 4x4 grid), [`configs/lejepa/dense.yaml`](../configs/lejepa/dense.yaml).
+   - dense: METER recipe (lambda 0.02, lr 5e-3, 4x4 grid), [`configs/lejepa/dense.yaml`](../configs/lejepa/dense.yaml);
+   - `classic_phase1.yaml` / `dense_phase1.yaml` reproduce the course-project code exactly: same views,
+     loss and gradients for the same seed (`scripts/verify_phase1_equivalence.py`). The protocol `dense`
+     differs from `dense_phase1` only in drawing crops and colour augmentation per image (phase 1 drew
+     one set of parameters for the whole batch).
 3. **Frozen encoder, decoder-only training**, identical procedure for the three initialisations
-   (random, LeJEPA classic, LeJEPA dense), 3 seeds each.
+   (random, LeJEPA classic, LeJEPA dense), 3 seeds each (`training/trainer.py`, `task: finetune`).
    - Open: the decoder loss, (A) photometric self-supervised or (B) ground-truth supervision.
+     (B) is implemented (scale-invariant log loss on depth, every model's output converted to depth by
+     `to_depth`); (A) waits for the decision.
 
 Totals: 12 pre-trainings (3 models x 2 variants x 2 datasets) and 54 decoder trainings
 (3 x 3 initialisations x 3 seeds x 2 datasets), plus FlexDepth on NYU and the public-weight evaluation.

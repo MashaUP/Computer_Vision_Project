@@ -11,6 +11,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
+def silog_loss(pred: torch.Tensor, gt: torch.Tensor, valid: torch.Tensor, variance_focus: float = 0.85) -> torch.Tensor:
+    """Scale-invariant log loss (Eigen et al. 2014, as in BTS / AdaBins): the common step-3 loss
+    with ground truth (option B). ``pred`` and ``gt`` are positive depths, ``valid`` a boolean mask."""
+    d = torch.log(pred[valid]) - torch.log(gt[valid])
+    return 10.0 * torch.sqrt((d ** 2).mean() - variance_focus * d.mean() ** 2 + 1e-8)
+
+
 def gaussian(window_size, sigma):
     gauss = torch.Tensor([
         exp(-(x - window_size // 2) ** 2 / float(2 * sigma ** 2))

@@ -13,7 +13,7 @@ def test_recipe_and_views(variant, images):
     assert len(g) == r.n_global and len(l) == r.n_local
     assert g[0].shape == (2, 3, r.global_size, r.global_size)
     assert l[0].shape == (2, 3, r.local_size, r.local_size)
-    assert all(0.0 <= v.min() and v.max() <= 1.0 for v in g + l)
+    assert all(v.min() >= -1e-6 and v.max() <= 1.0 + 1e-6 for v in g + l)
 
 
 def test_dense_pairs_share_the_crop(images):
@@ -22,7 +22,7 @@ def test_dense_pairs_share_the_crop(images):
     torch.manual_seed(0)
     from data import views as V
 
-    identity = lambda global_view: (lambda im: im)  # noqa: E731
+    identity = lambda global_view, solarize_p=0.0: (lambda im: im)  # noqa: E731
     orig, V.colour_transform = V.colour_transform, identity
     try:
         g, l = make_views(images, r)

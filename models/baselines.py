@@ -68,6 +68,10 @@ class DepthBaseline(nn.Module):
     def to_disparity(self, out: torch.Tensor) -> torch.Tensor:
         return out
 
+    def to_depth(self, out: torch.Tensor, min_depth: float = 0.1, max_depth: float = 80.0) -> torch.Tensor:
+        """Native output -> positive depth (scale is learned by the decoder; metrics align it)."""
+        return out.clamp(min=min_depth)
+
     def deepest_channels(self) -> int:
         with torch.no_grad():
             was_training = self.encoder.training
@@ -92,6 +96,10 @@ class FlexDepth(DepthBaseline):
     def decode(self, feats, hw):
         return self.decoder(feats)[("disp", 0)]
 
+    def to_depth(self, out, min_depth=0.1, max_depth=80.0):
+        # Monodepth2 disp_to_depth: sigmoid disparity spans [1/max_depth, 1/min_depth]
+        return 1.0 / (1.0 / max_depth + (1.0 / min_depth - 1.0 / max_depth) * out)
+
 
 class ZipDepth(DepthBaseline):
     name = "zipdepth"
@@ -113,6 +121,9 @@ class ZipDepth(DepthBaseline):
 
     def to_disparity(self, out):
         return out / (1.0 + out)  # monotonic map of [0, inf) to [0, 1)
+
+    def to_depth(self, out, min_depth=0.1, max_depth=80.0):
+        return 1.0 / (out + 1.0 / max_depth)  # inverse depth, bounded by max_depth
 
 
 class BoReDepth(DepthBaseline):

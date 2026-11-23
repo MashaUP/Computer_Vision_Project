@@ -47,10 +47,20 @@ On the ALCOR machines everything runs in Podman: see [`docs/alcor.md`](docs/alco
 ## Status
 | Step | State |
 |---|---|
-| Repository restructure, common model interface, LeJEPA classic/dense objective, protocol metrics, container | done |
-| Data scripts (NYU raw frames via HTTP range requests, KITTI raw + annotated, scene-level splits) | next |
-| Evaluation of the public weights (step 1) | next |
-| LeJEPA pre-training (step 2) and frozen-encoder decoder training (step 3) | after the step-3 loss decision |
+| Repository restructure, common model interface, protocol metrics, container and lab scripts | done |
+| LeJEPA classic / dense in one code path; phase-1 recipes reproduce the exam code exactly (`scripts/verify_phase1_equivalence.py`) | done |
+| One trainer for pre-training and frozen-encoder fine-tuning, with checkpoint + resume | done (step-3 loss: ground truth; photometric pending the decision) |
+| NYU complete download and labelled-frame extraction (`data/download/nyu.py`) | done, to run on the lab |
+| Public-weight loaders (step 1), KITTI preparation, NYU raw depth alignment | next |
+
+## Running
+```bash
+python main.py pretrain --config configs/runs/example_pretrain.yaml          # LeJEPA classic | dense
+python main.py finetune --config configs/runs/example_finetune.yaml          # frozen encoder, decoder only
+python main.py evaluate --config configs/runs/example_finetune.yaml --test-list splits/nyu_labeled_test.txt
+```
+Every run writes to `<runs root>/<name>/` (`config.yaml`, `metrics.csv`, `last.ckpt`) and resumes
+by itself when the same command is run again.
 
 ## Phase 1 (course project)
 The exam version (two METER setups, "classic" at the root and "experimental" dense, with notebooks,

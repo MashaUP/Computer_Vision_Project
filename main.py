@@ -1,11 +1,15 @@
 """Single entry point of the project: ``python main.py <command> [options]``.
 
-Available now
-  env     Python / PyTorch / CUDA, visible GPUs with the precision each one will use, data and runs roots.
-  check   build every model and run one LeJEPA step (classic and dense) on random images.
-          Runs on CPU by default, so it needs no GPU booking on the lab machines.
+Commands
+  env       Python / PyTorch / CUDA, visible GPUs with the precision each one will use, data and runs roots.
+  check     build every model and run one LeJEPA step (classic and dense) on random images.
+            Runs on CPU by default, so it needs no GPU booking on the lab machines.
+  pretrain  LeJEPA pre-training of an encoder:   python main.py pretrain --config configs/runs/<run>.yaml
+  finetune  frozen encoder, decoder training:    python main.py finetune --config configs/runs/<run>.yaml
+  evaluate  test metrics of a fine-tuned run:    python main.py evaluate --config ... --test-list ...
 
-Next (see README, "Status"): download, pretrain, finetune, evaluate.
+pretrain / finetune / evaluate accept ``--set key=value`` overrides (e.g. ``--set seed=1 epochs=2``).
+Re-running the same pretrain / finetune command resumes from the run's last checkpoint.
 """
 from __future__ import annotations
 
@@ -62,6 +66,32 @@ def cmd_check(args: argparse.Namespace) -> int:
     return 1 if failures else 0
 
 
+def _run_config(args):
+    from training.trainer import RunConfig, parse_overrides
+
+    return RunConfig.from_yaml(args.config, parse_overrides(args.set))
+
+
+def cmd_train(args: argparse.Namespace) -> int:
+    from training.trainer import Trainer
+
+    cfg = _run_config(args)
+    if cfg.task != args.command:
+        raise SystemExit(f"config task is {cfg.task!r}, command is {args.command!r}")
+    Trainer(cfg).fit()
+    return 0
+
+
+def cmd_evaluate(args: argparse.Namespace) -> int:
+    from training.trainer import evaluate_run
+
+    cfg = _run_config(args)
+    res = evaluate_run(cfg, args.test_list, args.weights)
+    for align, m in res.items():
+        print(f"{align:12s} " + " ".join(f"{k} {v:.4f}" for k, v in m.items()))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -72,6 +102,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--batch", type=int, default=2)
     p.add_argument("--slices", type=int, default=64, help="SIGReg slices for the check (recipes use more)")
     p.set_defaults(func=cmd_check)
+    for name, func in (("pretrain", cmd_train), ("finetune", cmd_train), ("evaluate", cmd_evaluate)):
+        p = sub.add_parser(name, help=f"{name} (see the module docstring)")
+        p.add_argument("--config", required=True)
+        p.add_argument("--set", nargs="*", default=[], metavar="KEY=VALUE")
+        if name == "evaluate":
+            p.add_argument("--test-list", required=True)
+            p.add_argument("--weights", default=None, help="model.pt (default: the run's own)")
+        p.set_defaults(func=func)
     args = parser.parse_args(argv)
     return args.func(args)
 

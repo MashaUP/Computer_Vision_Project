@@ -8,11 +8,12 @@ from torchvision.ops import MLP
 
 
 class ClassicProjector(nn.Module):
-    """Global-average-pooled feature -> MLP with BatchNorm (official LeJEPA: 2048-2048-512)."""
+    """Global-average-pooled feature -> MLP (official LeJEPA: 2048-2048-512 with BatchNorm;
+    phase 1: 256-512-64 with LayerNorm)."""
 
-    def __init__(self, in_channels: int, dims: tuple[int, ...] = (2048, 2048, 512)):
+    def __init__(self, in_channels: int, dims: tuple[int, ...] = (2048, 2048, 512), norm_layer=nn.BatchNorm1d):
         super().__init__()
-        self.mlp = MLP(in_channels, list(dims), norm_layer=nn.BatchNorm1d)
+        self.mlp = MLP(in_channels, list(dims), norm_layer=norm_layer)
         self.out_dim = dims[-1]
 
     def forward(self, fmap: torch.Tensor) -> torch.Tensor:  # (B, C, h, w) -> (B, D)
@@ -20,11 +21,12 @@ class ClassicProjector(nn.Module):
 
 
 class DenseProjector(nn.Module):
-    """Pool to a ``grid`` x ``grid`` token map -> per-token MLP with LayerNorm (METER: 256-512-64)."""
+    """Pool to a ``grid`` x ``grid`` token map -> per-token MLP (METER: 256-512-64 with LayerNorm)."""
 
-    def __init__(self, in_channels: int, dims: tuple[int, ...] = (256, 512, 64), grid: int = 4):
+    def __init__(self, in_channels: int, dims: tuple[int, ...] = (256, 512, 64), grid: int = 4,
+                 norm_layer=nn.LayerNorm):
         super().__init__()
-        self.mlp = MLP(in_channels, list(dims), norm_layer=nn.LayerNorm)
+        self.mlp = MLP(in_channels, list(dims), norm_layer=norm_layer)
         self.grid = grid
         self.out_dim = dims[-1]
 
