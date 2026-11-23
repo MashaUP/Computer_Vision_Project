@@ -1,0 +1,15 @@
+# LeJEPA classic: official recipe (galilai-group/lejepa).
+variant: classic
+lambd: 0.05            # loss = lambd * SIGReg + (1 - lambd) * invariance
+n_global: 2
+global_size: 224
+global_scale: [0.3, 1.0]
+n_local: 6
+local_size: 98          # METER needs multiples of 32 (phase 1: 256 / 128)
+local_scale: [0.05, 0.3]
+proj_dims: [2048, 2048, 512]
+num_slices: 1024
+epps_points: 17
+epps_t_max: null       # library default
+lr: 5.0e-4             # AdamW, warm-up + cosine
+weight_decay: 5.0e-4   # official value for CNN encoders

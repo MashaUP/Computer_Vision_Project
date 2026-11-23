@@ -1,15 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
 [project]
-name = "CV-project-25-26"
-version = "0.1.0"
-description = "Default template for PDM package"
-authors = [
-    {name = "Zunza5", email = "cazualdi@icloud.com"},
-]
-dependencies = ["torch>=2.11.0", "pip>=26.1.1", "ipykernel>=7.2.0", "numpy>=2.4.4", "scipy>=1.17.1", "einops>=0.8.2", "datasets>=4.8.5", "tdqm>=0.0.1", "h5py>=3.16.0", "torchvision>=0.26.0", "matplotlib>=3.11.0rc1", "lightning>=2.6.1", "lejepa @ git+https://github.com/galilai-group/lejepa.git", "wandb>=0.26.1", "ipywidgets>=8.1.8", "scikit-learn>=1.8.0", "timm>=1.0.27", "opencv-python>=4.13.0.92"]
-requires-python = "==3.12.*"
+name = "lean-geometry"
+version = "0.2.0"
+description = "LeJEPA self-supervised pre-training of lightweight monocular depth encoders (FlexDepth, ZipDepth, BoRe-Depth, METER) on NYU Depth V2 and KITTI."
 readme = "README.md"
-license = {text = "MIT"}
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Andrea Masciarelli" }, { name = "Luca Zualdi" }]
+# torch / torchvision are installed separately, from the wheel index that matches the GPU:
+# cu126 for Pascal (GTX 1080 / 1080 Ti, PyTorch <= 2.14), cu130 for newer GPUs. See docker/Dockerfile.
+dependencies = [
+    "lejepa @ git+https://github.com/galilai-group/lejepa.git@c293d29",
+    "numpy",
+    "scipy",
+    "einops",
+    "timm",
+    "pyyaml",
+    "h5py",
+    "opencv-python-headless",
+    "matplotlib",
+    "scikit-learn",
+    "pytest",
+]
 
+# Code runs from the repository root (no installed package): `pip install .` only installs the dependencies.
+[tool.setuptools]
+packages = []
 
-[tool.pdm]
-distribution = false
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+filterwarnings = ["ignore::FutureWarning:timm.*"]
