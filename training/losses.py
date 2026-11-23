@@ -1,6 +1,6 @@
 """METER supervised losses (paper Sec. III-B, Eq. 1): L1 depth + Sobel gradient + surface normals + SSIM.
 
-Ported unchanged from the phase-1 classic setup (``src/train.py``, commit 52aa283), which
+Ported unchanged from the phase-1 classic setup (``src/train.py`` of the exam version), which
 fixed the bugs of the course-provided ``sota/meter_reference/loss.py`` (kept as is for
 reference). Lambdas: 0.5 / 100 / 100 on NYU (centimetres), 0.5 / 1 / 1 on KITTI (metres).
 """

@@ -4,7 +4,7 @@
     "Delta1": 0.7132788608562691,
     "train_time_sec": 0.0,
     "eval_time_sec": 9.211081743240356,
-    "checkpoint": "C:\\Users\\andre\\Desktop\\CV-project-25-26\\models\\checkpoints\\finetune_nyu\\best-epoch=59-val_rmse=0.8174-nyu-xxs.ckpt",
+    "checkpoint": "models\\checkpoints\\finetune_nyu\\best-epoch=59-val_rmse=0.8174-nyu-xxs.ckpt",
     "variant": "lejepa",
     "dataset": "nyu",
     "arch": "xxs"

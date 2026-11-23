@@ -4,7 +4,7 @@
     "Delta1": 0.8465285408925499,
     "train_time_sec": 0.0,
     "eval_time_sec": 46.370497703552246,
-    "checkpoint": "C:\\Users\\andre\\Desktop\\CV-project-25-26\\models\\checkpoints\\finetune_kitti\\best-epoch=49-val_rmse=4.5792-kitti-xs.ckpt",
+    "checkpoint": "models\\checkpoints\\finetune_kitti\\best-epoch=49-val_rmse=4.5792-kitti-xs.ckpt",
     "variant": "lejepa",
     "dataset": "kitti",
     "arch": "xs"

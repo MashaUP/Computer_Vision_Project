@@ -1,6 +1,6 @@
 """METER: MobileViT encoder + lightweight decoder for monocular depth estimation.
 
-Ported from the phase-1 course project (``src/network.py``, commit 52aa283) and
+Ported from the phase-1 course project (``src/network.py`` of the exam version) and
 merged with the experimental (dense) branch, which differed only in two places,
 both exposed here as options and off by default:
 

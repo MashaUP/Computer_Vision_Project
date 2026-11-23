@@ -1,4 +1,4 @@
-# LeJEPA classic exactly as in the phase-1 course code (src/train.py LeJEPAMeter, commit 52aa283),
+# LeJEPA classic exactly as in the phase-1 course code (src/train.py LeJEPAMeter, exam version),
 # with the hyper-parameters of the phase-1 runs (results/phase1_meter/classic/*/logs/ssl/*/hparams.yaml).
 variant: classic
 lambd: 0.05

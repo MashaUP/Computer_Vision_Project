@@ -22,5 +22,5 @@
 - KITTI raw and depth benchmark: <https://www.cvlibs.net/datasets/kitti/>
 
 ## Phase 1
-The course assignment (`Project_7.pdf`), the paper PDFs and the presentation are in commit `52aa283`
-(tag `v1.0-course-project`).
+The course assignment (`Project_7.pdf`), the paper PDFs and the presentation are in the original repository,
+<https://github.com/Zunza5/lejepa-monocular-depth-estimation> (full history; this repository restarted its history to stay light).

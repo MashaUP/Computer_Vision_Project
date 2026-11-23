@@ -4,7 +4,7 @@
     "Delta1": 0.858741275772004,
     "train_time_sec": 0.0,
     "eval_time_sec": 31.43591833114624,
-    "checkpoint": "C:\\Users\\andre\\Desktop\\CV-project-25-26\\models\\checkpoints\\finetune_from_scratch_kitti\\best-epoch=59-val_rmse=4.5534-kitti-xs.ckpt",
+    "checkpoint": "models\\checkpoints\\finetune_from_scratch_kitti\\best-epoch=59-val_rmse=4.5534-kitti-xs.ckpt",
     "variant": "from_scratch",
     "dataset": "kitti",
     "arch": "xs"
