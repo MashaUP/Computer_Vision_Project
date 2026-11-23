@@ -1,4 +1,4 @@
-"""Phase-1 METER evaluation utilities (ported from ``src/evaluation.py``, commit 52aa283).
+"""Phase-1 METER evaluation utilities (ported from ``src/evaluation.py`` of the exam version).
 
 Metric computation with the phase-1 conventions, full test-set evaluation, encoder feature
 extraction, PCA geometric probing, prediction plots and latency benchmarking.

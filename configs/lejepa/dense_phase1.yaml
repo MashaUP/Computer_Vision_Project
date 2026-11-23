@@ -1,4 +1,4 @@
-# LeJEPA dense exactly as in the phase-1 course code (experimental_setup/src/train.py, commit 52aa283),
+# LeJEPA dense exactly as in the phase-1 course code (experimental_setup/src/train.py, exam version),
 # with the hyper-parameters of the phase-1 runs (results/phase1_meter/dense/xxs/logs/*/hparams.yaml).
 # One set of augmentation parameters per batch, as torchvision v2 does on a batch tensor.
 variant: dense

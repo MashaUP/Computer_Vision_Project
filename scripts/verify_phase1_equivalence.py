@@ -5,7 +5,7 @@ the phase-1 ``LeJEPAMeter`` and the new ``METER`` + ``LeJEPALoss`` with the ``*_
 copies the phase-1 weights into the new modules, and compares, for the same seed and images:
 the views, the loss and its terms, and the encoder gradients.
 
-    git worktree add /tmp/phase1 52aa283        # or any checkout of the exam version
+    git clone https://github.com/Zunza5/lejepa-monocular-depth-estimation /tmp/phase1    # the exam version (original repository)
     python scripts/verify_phase1_equivalence.py --phase1 /tmp/phase1
 
 Needs the phase-1 dependencies (lightning, h5py, opencv, scipy). CPU only.
@@ -124,7 +124,7 @@ def dense(phase1: Path, seed: int, tol: float) -> bool:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--phase1", type=Path, required=True, help="checkout of commit 52aa283")
+    ap.add_argument("--phase1", type=Path, required=True, help="checkout of the exam version (original repository)")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--tol", type=float, default=1e-5)
     args = ap.parse_args()

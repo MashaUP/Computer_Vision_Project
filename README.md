@@ -64,5 +64,6 @@ by itself when the same command is run again.
 
 ## Phase 1 (course project)
 The exam version (two METER setups, "classic" at the root and "experimental" dense, with notebooks,
-checkpoints and outputs) is commit `52aa283` (tag `v1.0-course-project`). Its results are in
+checkpoints and outputs, with full history) is the original repository
+<https://github.com/Zunza5/lejepa-monocular-depth-estimation>. Its results are in
 [`results/phase1_meter/`](results/phase1_meter/); METER itself lives on in `models/meter.py`.
