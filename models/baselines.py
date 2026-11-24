@@ -3,7 +3,7 @@
 ``encode(x)`` takes RGB in [0, 1] (B, 3, H, W), applies the input normalisation of the original
 method and returns the feature pyramid, finest first: ``feats[-1]`` is the deepest map
 (stride 32), the one LeJEPA is applied to. ``decode(feats, hw)`` returns the decoder's native
-output and ``disparity(x)`` a common disparity in (0, 1] at input resolution.
+output and ``to_depth(out)`` converts it to a positive depth.
 
 The ``output_kind`` of each model says what ``decode`` returns:
 
@@ -11,14 +11,12 @@ The ``output_kind`` of each model says what ``decode`` returns:
 * ``relu_inverse_depth``: ZipDepth, affine-invariant inverse depth in [0, inf).
 * ``depth``: BoRe-Depth (1 / (10 * sigmoid + 0.01), SC-Depth style) and METER (metric depth).
 
-How decoder outputs are trained in step 3 (photometric vs. GT loss) is still open; the
-``disparity`` helper is only a common, monotonic view of the outputs.
+How decoder outputs are trained in step 3 (photometric vs. GT loss) is still open.
 """
 from __future__ import annotations
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from sota import loader
 
@@ -59,15 +57,6 @@ class DepthBaseline(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.decode(self.encode(x), x.shape[-2:])
 
-    def disparity(self, x: torch.Tensor) -> torch.Tensor:
-        out = self.forward(x)
-        if out.shape[-2:] != x.shape[-2:]:
-            out = F.interpolate(out, size=x.shape[-2:], mode="bilinear", align_corners=False)
-        return self.to_disparity(out)
-
-    def to_disparity(self, out: torch.Tensor) -> torch.Tensor:
-        return out
-
     def to_depth(self, out: torch.Tensor, min_depth: float = 0.1, max_depth: float = 80.0) -> torch.Tensor:
         """Native output -> positive depth (scale is learned by the decoder; metrics align it)."""
         return out.clamp(min=min_depth)
@@ -76,7 +65,7 @@ class DepthBaseline(nn.Module):
         with torch.no_grad():
             was_training = self.encoder.training
             self.encoder.eval()
-            c = self.encode(torch.rand(1, 3, 128, 128))[-1].shape[1]
+            c = self.encode(torch.rand(1, 3, 128, 128, device=next(self.parameters()).device))[-1].shape[1]
             self.encoder.train(was_training)
         return c
 
@@ -89,6 +78,10 @@ class FlexDepth(DepthBaseline):
         enc, dec = loader.load_flexdepth(scale)
         super().__init__(enc, dec)
         self.scale = scale
+        # FlexDepth's FLOPs profiler forwards torch.empty() through the live encoder: BN running stats can come out NaN
+        for m in self.modules():
+            if isinstance(m, nn.modules.batchnorm._BatchNorm):
+                m.reset_running_stats()
 
     def encode(self, x):
         return list(self.encoder(x))  # YOLOEncoder normalises internally: (x - 0.45) / 0.225
@@ -119,9 +112,6 @@ class ZipDepth(DepthBaseline):
     def decode(self, feats, hw):
         return self.decoder(feats[0], feats[1:], tuple(hw))
 
-    def to_disparity(self, out):
-        return out / (1.0 + out)  # monotonic map of [0, inf) to [0, 1)
-
     def to_depth(self, out, min_depth=0.1, max_depth=80.0):
         return 1.0 / (out + 1.0 / max_depth)  # inverse depth, bounded by max_depth
 
@@ -141,9 +131,6 @@ class BoReDepth(DepthBaseline):
 
     def decode(self, feats, hw):
         return self.decoder(feats)[0]  # finest-scale depth
-
-    def to_disparity(self, out):
-        return (1.0 / out) / 10.01  # 1/depth lies in (0.01, 10.01)
 
 
 class METER(DepthBaseline):
@@ -167,9 +154,6 @@ class METER(DepthBaseline):
     def decode(self, feats, hw):
         return self.decoder(feats[-1], feats[:-1])
 
-    def to_disparity(self, out):
-        return 1.0 / out.clamp(min=1e-3)
-
 
 def build_model(name: str, variant: str | None = None) -> DepthBaseline:
     """``flexdepth`` (n|s|m...), ``zipdepth`` (base|small), ``bore``, ``meter`` (xxs|xs|s)."""
@@ -182,6 +166,3 @@ def build_model(name: str, variant: str | None = None) -> DepthBaseline:
     if name == "meter":
         return METER(variant or "xxs")
     raise ValueError(f"unknown model {name!r}")
-
-
-MODELS = ("flexdepth", "zipdepth", "bore", "meter")

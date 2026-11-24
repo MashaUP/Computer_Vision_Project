@@ -25,8 +25,8 @@ models/            METER (meter.py), common interface of every model (baselines.
 data/              data code only (views for LeJEPA, download scripts, split lists); data lives outside the repo
 sota/              third-party code, never modified: baselines as pinned submodules, course reference files
 utils/             device/precision policy, seeding, paths, result I/O
-training/          LeJEPA objective (classic | dense), METER supervised loss
-evaluation/        protocol metrics (crops, caps, median / scale-shift alignment), phase-1 METER utilities
+training/          LeJEPA objective (classic | dense), step-3 loss, trainer with resume
+evaluation/        protocol metrics (crops, caps, median / scale-shift alignment)
 configs/           recipes (configs/lejepa/classic.yaml, dense.yaml)
 docker/            Dockerfile (cu126 for the lab GPUs, cu130 for an RTX 5070)
 scripts/alcor/     build, run and clean up containers on the ALCOR machines
@@ -40,7 +40,7 @@ docs/              protocol, how to work on the lab machines, references
 git clone --recurse-submodules https://github.com/MashaUP/Computer_Vision_Project.git
 cd Computer_Vision_Project
 # local (any machine with PyTorch): `pip install .` installs the dependencies only (code runs from the repo root)
-pip install . && python -m pytest -q && python main.py check
+pip install '.[test]' && python -m pytest -q && python main.py check
 ```
 On the ALCOR machines everything runs in Podman: see [`docs/alcor.md`](docs/alcor.md).
 

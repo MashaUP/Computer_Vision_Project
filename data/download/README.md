@@ -16,7 +16,9 @@ scripts/alcor/run.sh cpu nyu_frames   python3 -m data.download.nyu frames --stri
   NYU page. Interrupted downloads resume (HTTP range requests) and every file is checked against
   the size reported by the server: re-run the same command until it reports all files complete.
 - `extract-labeled`: the 1449 labelled frames as PNGs (depth in millimetres, uint16) and the lists
-  `splits/nyu_labeled_{train,test}.txt` (official split: 795 / 654) and `splits/nyu_test_scenes.txt`.
+  `splits/nyu_labeled_{train,val,test}.txt` and `splits/nyu_test_scenes.txt`. The official split is
+  795 train / 654 test; about 10% of the train **scenes** (fixed seed, whole scenes so none is split
+  between train and val) go to `val`, so train has fewer than 795 frames.
 - `frames`: every k-th RGB frame of every raw scene that is **not** a test scene, for LeJEPA
   pre-training and the BatchNorm re-estimation (`splits/nyu_raw_frames_stride<k>.txt`).
 

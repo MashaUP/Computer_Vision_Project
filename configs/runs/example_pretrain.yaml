@@ -6,7 +6,7 @@ model: flexdepth
 variant: n
 dataset: nyu
 recipe: dense               # classic | dense (protocol) | classic_phase1 | dense_phase1
-train_list: splits/nyu_raw_train_frames.txt
+train_list: splits/nyu_raw_frames_stride10.txt
 image_size: [288, 384]      # frames are resized to this before the views are cropped
 batch_size: 64
 num_workers: 4

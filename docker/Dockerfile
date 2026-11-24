@@ -24,7 +24,7 @@ RUN pip3 install "torch==${TORCH}" torchvision --index-url "https://download.pyt
 
 # Every other dependency comes from pyproject.toml (single source of truth).
 COPY pyproject.toml /tmp/pyproject.toml
-RUN python3 -c "import tomllib; print('\n'.join(tomllib.load(open('/tmp/pyproject.toml', 'rb'))['project']['dependencies']))" > /requirements.txt \
+RUN python3 -c "import tomllib; p = tomllib.load(open('/tmp/pyproject.toml', 'rb'))['project']; print('\n'.join(p['dependencies'] + p['optional-dependencies']['test']))" > /requirements.txt \
     && pip install -r /requirements.txt
 
 RUN mkdir /.cache && chmod 777 /.cache

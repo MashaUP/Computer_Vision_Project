@@ -40,6 +40,6 @@ podman run -d --rm --name "$NAME" \
     -v "$BASE/data:/work/data" -v "$BASE/runs:/work/runs" -v "$BASE/cache:/work/cache" \
     -e LG_DATA_ROOT=/work/data -e LG_RUNS_ROOT=/work/runs -e LG_CACHE_ROOT=/work/cache \
     -w /work/project "$IMAGE" \
-    sh -c '"$@" 2>&1 | tee -a "/work/runs/'"$NAME"'/stdout.log"' sh "$@"
+    bash -c 'set -o pipefail; "$@" 2>&1 | tee -a "/work/runs/'"$NAME"'/stdout.log"' bash "$@"
 
 echo "started $NAME | logs: podman logs -f $NAME | file: $BASE/runs/$NAME/stdout.log"

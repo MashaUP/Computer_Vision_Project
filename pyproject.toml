@@ -21,10 +21,10 @@ dependencies = [
     "pyyaml",
     "h5py",
     "opencv-python-headless",
-    "matplotlib",
-    "scikit-learn",
-    "pytest",
 ]
+
+[project.optional-dependencies]
+test = ["pytest"]
 
 # Code runs from the repository root (no installed package): `pip install .` only installs the dependencies.
 [tool.setuptools]

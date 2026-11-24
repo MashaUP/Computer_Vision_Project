@@ -18,7 +18,7 @@ Recipes are in ``configs/lejepa/``. ``classic`` and ``dense`` are the protocol r
 """
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field, fields
+from dataclasses import dataclass, fields
 from pathlib import Path
 from typing import Callable
 
@@ -63,7 +63,6 @@ class Recipe:
     epochs: int = 50
     warmup_epochs: int = 10
     eta_min_ratio: float = 1e-3        # cosine floor = lr * eta_min_ratio
-    extra: dict = field(default_factory=dict)
 
     def __post_init__(self):
         checks = {"variant": ("classic", "dense"), "proj_norm": ("batchnorm", "layernorm"),
@@ -85,9 +84,10 @@ def load_recipe(name_or_path: str, dataset: str | None = None, **overrides) -> R
     if dataset is not None:
         cfg.update(by_dataset.get(dataset, {}))
     cfg.update(overrides)
-    known = {f.name for f in fields(Recipe)}
-    extra = {k: cfg.pop(k) for k in list(cfg) if k not in known}
-    return Recipe(**cfg, extra=extra)
+    unknown = set(cfg) - {f.name for f in fields(Recipe)}
+    if unknown:
+        raise ValueError(f"unknown recipe keys in {path}: {sorted(unknown)}")
+    return Recipe(**cfg)
 
 
 class LeJEPALoss(nn.Module):
@@ -155,7 +155,3 @@ def lejepa_step(encode: Callable[[torch.Tensor], list[torch.Tensor]], criterion:
     deep_g = list(torch.split(encode(torch.cat(g))[-1], b))
     deep_l = list(torch.split(encode(torch.cat(l))[-1], b))
     return criterion(deep_g, deep_l)
-
-
-def recipe_dict(recipe: Recipe) -> dict:
-    return asdict(recipe)

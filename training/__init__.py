@@ -1,5 +1,2 @@
-"""Training objectives: LeJEPA pre-training (``lejepa.py``) and the METER supervised loss (``losses.py``).
-
-The common trainer for step 3 (frozen encoder, decoder-only fine-tuning) comes next, once the
-step-3 loss (photometric vs. ground truth) is decided.
-"""
+"""Training: LeJEPA objective (``lejepa.py``), step-3 depth loss (``losses.py``) and the common trainer
+(``trainer.py``): pre-training and frozen-encoder fine-tuning, with checkpoint and resume."""

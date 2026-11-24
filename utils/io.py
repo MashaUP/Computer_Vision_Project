@@ -14,10 +14,6 @@ def save_json(obj: Any, path: str | Path) -> Path:
     return path
 
 
-def load_json(path: str | Path) -> Any:
-    return json.loads(Path(path).read_text())
-
-
 def append_csv_row(row: Mapping[str, Any], path: str | Path) -> Path:
     """Append one row, writing the header the first time. Columns must stay the same."""
     path = Path(path)

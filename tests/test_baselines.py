@@ -42,11 +42,11 @@ def test_frozen_encoder_decoder_step(name):
     x = torch.rand(2, 3, 192, 640)
     with torch.no_grad():
         feats = m.encode(x)
-    disp = m.to_disparity(m.decode(feats, x.shape[-2:]))
-    disp.mean().backward()
+    out = m.decode(feats, x.shape[-2:])
+    out.mean().backward()
     opt.step()
     assert all(torch.equal(v, before[k]) for k, v in m.encoder.state_dict().items())
-    assert torch.isfinite(disp).all() and disp.min() >= 0 and disp.max() <= 1
+    assert torch.isfinite(out).all()
 
 
 def test_baselines_do_not_leak_module_names():
@@ -67,3 +67,12 @@ def test_lejepa_step(name, variant):
     assert torch.isfinite(out["loss"])
     out["loss"].backward()
     assert any(p.grad is not None for p in m.encoder.parameters())
+
+
+def test_flexdepth_has_no_nan_after_construction():
+    # the sota constructor forwards uninitialised memory through the encoder: running stats were NaN in ~60% of builds
+    for i in range(8):
+        torch.manual_seed(i)
+        m = build_model("flexdepth")
+        bad = [n for n, t in [*m.named_parameters(), *m.named_buffers()] if not torch.isfinite(t).all()]
+        assert not bad, bad[:3]

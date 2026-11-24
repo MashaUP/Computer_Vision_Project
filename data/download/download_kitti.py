@@ -6,19 +6,19 @@ Download KITTI (depth GT + RGB) for the METER + LeJEPA project.
 Quick start
 -----------
   # Full download (depth GT ~1.8 GB + RGB ~45 GB):
-  python download_kitti.py --output_dir ./data/raw/kitti
+  python -m data.download.download_kitti --output_dir ./data/raw/kitti
 
   # Depth GT only:
-  python download_kitti.py --output_dir ./data/raw/kitti --skip_rgb
+  python -m data.download.download_kitti --output_dir ./data/raw/kitti --skip_rgb
 
   # RGB only (depth GT already present):
-  python download_kitti.py --output_dir ./data/raw/kitti --skip_depth
+  python -m data.download.download_kitti --output_dir ./data/raw/kitti --skip_depth
 
   # Dry run (print URLs without downloading):
-  python download_kitti.py --output_dir ./data/raw/kitti --dry_run
+  python -m data.download.download_kitti --output_dir ./data/raw/kitti --dry_run
 
   # Use the hardcoded sequence list instead of auto-detection:
-  python download_kitti.py --output_dir ./data/raw/kitti --use_hardcoded
+  python -m data.download.download_kitti --output_dir ./data/raw/kitti --use_hardcoded
 
 Output layout
 -------------
@@ -51,11 +51,11 @@ Calibration by date:
 
 import argparse
 import re
-import time
-import urllib.request
 import zipfile
 from pathlib import Path
 from typing import List, Set, Tuple
+
+from data.download.nyu import download
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -96,53 +96,17 @@ KNOWN_EIGEN_SEQUENCES: List[Tuple[str, str]] = [
 # Download helpers
 # ---------------------------------------------------------------------------
 
-def _download(url: str, dest: Path, dry_run: bool = False,
-              retries: int = 3, chunk_mb: int = 4) -> bool:
-    """
-    Download url to dest with retries and a text progress bar.
-    Return True on success, False otherwise.
-    """
+def _download(url: str, dest: Path, dry_run: bool = False) -> bool:
+    """Resumable, size-checked download (``nyu.download``). Return True on success."""
     if dry_run:
         print(f"    [DRY-RUN] {url}")
         return True
-
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    tmp = dest.with_suffix(dest.suffix + ".part")
-
-    for attempt in range(1, retries + 1):
-        try:
-            req = urllib.request.Request(
-                url,
-                headers={"User-Agent": "Mozilla/5.0"}
-            )
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                total = int(resp.headers.get("Content-Length", 0))
-                chunk = chunk_mb * 1024 * 1024
-                downloaded = 0
-                with open(tmp, "wb") as f:
-                    while True:
-                        buf = resp.read(chunk)
-                        if not buf:
-                            break
-                        f.write(buf)
-                        downloaded += len(buf)
-                        if total:
-                            pct = downloaded / total * 100
-                            mb  = downloaded / 1024 / 1024
-                            print(f"\r    {mb:7.1f} MB  ({pct:5.1f}%)", end="", flush=True)
-            print()  # newline after progress
-            tmp.rename(dest)
-            return True
-
-        except Exception as exc:
-            print(f"\n    [WARN] attempt {attempt}/{retries}: {exc}")
-            if tmp.exists():
-                tmp.unlink()
-            if attempt < retries:
-                time.sleep(3 * attempt)
-
-    print(f"    [ERROR] download failed: {url}")
-    return False
+    try:
+        download(url, dest)
+        return True
+    except Exception as exc:  # noqa: BLE001 - report and go on with the next file
+        print(f"    [ERROR] download failed: {url}: {exc}")
+        return False
 
 
 def _unzip(zip_path: Path, dest_dir: Path, dry_run: bool = False) -> bool:
@@ -227,7 +191,10 @@ def download_depth_gt(output_dir: Path, dry_run: bool) -> Path:
 
     # Extract
     if not dry_run:
-        ok = _unzip(zip_path, output_dir, dry_run)
+        # shortcut: assumes the zip root holds train/ and val/ (not checked); if it is wrapped in a
+        # data_depth_annotated/ folder, extract into depth_root instead. One path for download,
+        # detect_sequences and verify: output_dir/depth/data_depth_annotated.
+        ok = _unzip(zip_path, depth_dir, dry_run)
         if ok:
             print("  [OK] depth GT extracted")
         else:
@@ -285,13 +252,11 @@ def download_sequence_rgb(date: str, drive: str,
     Extracted into: rgb_dir/{date}/
     """
     drive_name = f"{date}_drive_{drive}_sync"
-    seq_path = rgb_dir / drive_name
+    seq_path = rgb_dir / date / drive_name       # where the zip extracts (same path as verify())
 
     if (seq_path / "image_02" / "data").exists():
         print(f"  [SKIP] {drive_name}")
         return True
-
-    n_png = len(list((seq_path / "image_02" / "data").rglob("*.png")))
 
     zip_name = f"{drive_name}.zip"
     url = f"{_RAW_BASE}/{date}_drive_{drive}/{zip_name}"

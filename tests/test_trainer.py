@@ -7,7 +7,10 @@ import pytest
 import torch
 from PIL import Image
 
-from training.trainer import RunConfig, Trainer, evaluate_run
+from models.baselines import build_model
+from sota.loader import BaselineNotAvailable
+from training.losses import silog_loss
+from training.trainer import EpochSampler, RunConfig, Trainer, evaluate_run
 
 
 @pytest.fixture
@@ -39,8 +42,10 @@ def _pretrain_cfg(**kw):
 
 def test_pretrain_resume_and_finetune(roots):
     _, runs = roots
-    Trainer(_pretrain_cfg(epochs=1)).fit()                       # stops after epoch 0
-    tr = Trainer(_pretrain_cfg(epochs=2))                         # same run name: resumes
+    first = Trainer(_pretrain_cfg(epochs=2))
+    first.epochs = 1                                              # interrupted after epoch 0
+    first.fit()
+    tr = Trainer(_pretrain_cfg(epochs=2))                         # same run name and config: resumes
     assert tr.epoch == 1 and tr.step == 2
     tr.fit()
     rows = list(csv.DictReader(open(runs / "pre/metrics.csv")))
@@ -60,6 +65,7 @@ def test_pretrain_resume_and_finetune(roots):
     Trainer(RunConfig(name="ft_random", init="random", bn_recal_batches=2, **ft)).fit()
     res = evaluate_run(RunConfig(name="ft_random", init="random", **ft), "pairs.txt")
     assert set(res) == {"none", "median", "scale_shift"} and all(np.isfinite(list(res["median"].values())))
+    assert (runs / "ft_random/test_metrics_pairs.json").exists()
 
 
 @pytest.mark.parametrize("recipe", ["classic", "classic_phase1", "dense_phase1"])
@@ -72,3 +78,79 @@ def test_pretrain_recipes_run(roots, recipe):
         if "submodule" in str(e):
             pytest.skip(str(e))
         raise
+
+
+def test_resume_refuses_a_different_config(roots):
+    first = Trainer(_pretrain_cfg(epochs=2))
+    first.epochs = 1
+    first.fit()
+    with pytest.raises(ValueError, match="lr"):
+        Trainer(_pretrain_cfg(epochs=2, lr=1e-3))
+    Trainer(_pretrain_cfg(epochs=2, num_workers=1, log_every=7))  # harmless keys may change
+
+
+def test_resume_in_the_middle_of_an_epoch(roots):
+    _, runs = roots
+    cfg = _pretrain_cfg(epochs=1, max_steps_per_epoch=4, ckpt_minutes=0)   # checkpoint after every step
+    tr, orig, calls = Trainer(cfg), None, []
+    orig = tr._loss
+
+    def interrupted(batch):
+        if len(calls) == 2:
+            raise KeyboardInterrupt
+        calls.append(1)
+        return orig(batch)
+
+    tr._loss = interrupted
+    with pytest.raises(KeyboardInterrupt):
+        tr.fit()
+    tr2 = Trainer(cfg)
+    assert (tr2.epoch, tr2.batch_in_epoch, tr2.step, tr2.n) == (0, 2, 2, 2) and tr2.sums["loss"] > 0
+    tr2.fit()
+    rows = list(csv.DictReader(open(runs / "pre/metrics.csv")))
+    assert len(rows) == 1 and rows[0]["step"] == "4"
+
+
+def test_finetune_val_every_and_bn_list(roots):
+    _, runs = roots
+    cfg = RunConfig(task="finetune", name="ft", model="meter", variant="xxs", dataset="nyu", train_list="pairs.txt",
+                    val_list="pairs.txt", bn_list="frames.txt", init="random", bn_recal_batches=1, epochs=2,
+                    val_every=2, warmup_epochs=1, image_size=[128, 192], batch_size=2, num_workers=0,
+                    max_steps_per_epoch=1, device="cpu")
+    Trainer(cfg).fit()
+    rows = list(csv.DictReader(open(runs / "ft/metrics.csv")))
+    assert rows[0]["val_abs_rel"] == "" and float(rows[1]["val_abs_rel"]) > 0     # same columns every epoch
+
+
+def test_epoch_sampler_resumes_with_the_tail_of_the_permutation():
+    s = EpochSampler(10, seed=0)
+    s.set(3)
+    full = list(s)
+    s.set(3, 4)
+    assert sorted(full) == list(range(10)) and list(s) == full[4:] and len(s) == 6
+    s.set(4)
+    assert list(s) != full                                        # another epoch, another order
+
+
+def test_silog_without_valid_pixel_is_zero_not_nan():
+    p = torch.rand(2, 1, 4, 4, requires_grad=True) + 0.1
+    loss = silog_loss(p, p.detach(), torch.zeros_like(p, dtype=torch.bool))
+    assert loss == 0
+    loss.backward()
+
+
+def test_depth_conversion_uses_the_default_min_depth():
+    """FlexDepth at sigmoid 0.5 must give ~0.2 m (min_depth 0.1), not 0.002 m (min_depth 1e-3)."""
+    try:
+        model = build_model("flexdepth")
+    except BaselineNotAvailable as e:
+        pytest.skip(str(e))
+    tr = Trainer.__new__(Trainer)
+    tr.model, tr.cap = model, 10.0
+    depth = tr._depth(torch.full((1, 1, 4, 4), 0.5), (4, 4))
+    assert depth.min() >= 0.1 and depth.max() <= 10.0
+
+
+def test_deepest_channels_on_the_model_device():
+    """The probe image is created where the parameters are (it crashed on GPU/MPS)."""
+    assert build_model("meter").to("meta").deepest_channels() == 160

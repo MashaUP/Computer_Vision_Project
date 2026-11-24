@@ -5,13 +5,15 @@
 * ``task: finetune``: step 3. The encoder is initialised (``random``, ``lejepa`` from a pre-training
   run, or ``public``), **frozen in eval mode**, and only the decoder is trained with the same
   procedure for every arm. For ``random`` the BatchNorm statistics are first re-estimated on
-  unlabelled frames.
+  the unlabelled frames of ``bn_list`` (without it, on the RGB column of ``train_list``).
 
 Common to both: seeding, automatic precision (fp32 on Pascal, fp16 autocast otherwise, never
 bf16), AdamW, per-epoch linear warm-up + cosine schedule (as in phase 1), gradient clipping,
 CSV logging, and **checkpoint + automatic resume**: ``last.ckpt`` is written atomically at the end
-of every epoch and every ``ckpt_minutes``; re-running the same command continues from it, with the
-same sample order (lab machines restart every three months).
+of every epoch and every ``ckpt_minutes``; re-running the same command continues from it (lab
+machines restart every three months). The sample order is the same as without the interruption; the
+random augmentation after a mid-epoch resume is not. A resume with a different configuration (other
+than ``device``, ``num_workers``, ``log_every``, ``ckpt_minutes``) is refused.
 
 Run directory: ``<runs root>/<name>/`` with ``config.yaml``, ``metrics.csv``, ``last.ckpt``.
 """
@@ -32,7 +34,7 @@ import yaml
 from torch.utils.data import DataLoader, Dataset, Sampler
 
 from data.datasets import DepthPairs, ImageList
-from evaluation.metrics import CAPS, MIN_DEPTH, depth_metrics, mean_metrics
+from evaluation.metrics import CAPS, METRICS, MIN_DEPTH, depth_metrics, mean_metrics
 from models.baselines import build_model
 from training.lejepa import LeJEPALoss, lejepa_step, load_recipe
 from training.losses import silog_loss
@@ -42,6 +44,7 @@ from utils.io import append_csv_row, save_json
 from utils.seed import seed_worker, set_seed
 
 DEPTH_SCALE = {"nyu": 1000.0, "kitti": 256.0}
+RESUME_FREE = {"device", "num_workers", "log_every", "ckpt_minutes"}   # may change between a run and its resume
 
 
 @dataclass
@@ -62,6 +65,7 @@ class RunConfig:
     encoder_ckpt: str | None = None        # lejepa: path to encoder.pt of a pre-training run
     loss: str = "silog"                    # silog (ground truth); photometric: pending the step-3 decision
     bn_recal_batches: int = 200
+    bn_list: str | None = None             # random init: list of unlabelled frames for BatchNorm (default: train_list)
     # optimisation (pretrain: recipe values unless set here)
     epochs: int | None = None
     batch_size: int = 32
@@ -76,6 +80,7 @@ class RunConfig:
     device: str = "auto"
     ckpt_minutes: float = 30.0
     log_every: int = 50
+    val_every: int = 1                     # validate every N epochs (and always after the last one)
     max_steps_per_epoch: int | None = None  # pilot runs: cut every epoch short
 
     @classmethod
@@ -184,10 +189,12 @@ class Trainer:
         self.scaler = torch.amp.GradScaler("cuda", enabled=self.precision == "fp16-mixed")
         self.sampler = EpochSampler(len(self.train_set), cfg.seed)
         self.epoch, self.batch_in_epoch, self.step = 0, 0, 0
+        self.sums, self.n = {}, 0      # running train means of the current epoch
         self.last_ckpt = self.dir / "last.ckpt"
         if self.last_ckpt.exists():
             self._resume()
-        (self.dir / "config.yaml").write_text(yaml.safe_dump(dataclasses.asdict(cfg), sort_keys=False))
+        else:
+            (self.dir / "config.yaml").write_text(yaml.safe_dump(dataclasses.asdict(cfg), sort_keys=False))
 
     # ------------------------------------------------------------------ setup
     def _hp(self, name, default):
@@ -231,7 +238,9 @@ class Trainer:
             state = torch.load(cfg.encoder_ckpt, map_location="cpu", weights_only=True)
             self.model.encoder.load_state_dict(state, strict=True)
         elif cfg.init == "random":
-            frames = ImageList(_resolve(cfg.train_list), paths.data_root(), cfg.image_size)
+            if cfg.bn_list is None:
+                print("[bn] warning: no bn_list, using the RGB frames of train_list (not unlabelled frames)")
+            frames = ImageList(_resolve(cfg.bn_list or cfg.train_list), paths.data_root(), cfg.image_size)
             frames.items = [it[:1] for it in frames.items]
             loader = DataLoader(frames, batch_size=self.cfg.batch_size, shuffle=True, num_workers=cfg.num_workers,
                                 worker_init_fn=seed_worker, generator=torch.Generator().manual_seed(cfg.seed))
@@ -249,10 +258,16 @@ class Trainer:
                 "criterion": self.criterion.state_dict() if self.cfg.task == "pretrain" else None,
                 "opt": self.opt.state_dict(), "sched": self.sched.state_dict(), "scaler": self.scaler.state_dict(),
                 "epoch": self.epoch, "batch_in_epoch": self.batch_in_epoch, "step": self.step,
+                "sums": self.sums, "n": self.n,
                 "rng": _rng_state(), "config": dataclasses.asdict(self.cfg)}
 
     def _resume(self):
         s = torch.load(self.last_ckpt, map_location="cpu", weights_only=False)
+        new = dataclasses.asdict(self.cfg)
+        diff = sorted(k for k in new if k not in RESUME_FREE and new[k] != s["config"].get(k, new[k]))
+        if diff:
+            raise ValueError(f"{self.last_ckpt}: config differs from the run being resumed in {diff}; "
+                             "use another run name, or delete the run directory to start over")
         self.model.load_state_dict(s["model"])
         if s["criterion"] is not None:
             self.criterion.load_state_dict(s["criterion"])
@@ -260,6 +275,7 @@ class Trainer:
         self.sched.load_state_dict(s["sched"])
         self.scaler.load_state_dict(s["scaler"])
         self.epoch, self.batch_in_epoch, self.step = s["epoch"], s["batch_in_epoch"], s["step"]
+        self.sums, self.n = s["sums"], s["n"]
         _set_rng_state(s["rng"])
         print(f"[resume] {self.last_ckpt}: epoch {self.epoch}, batch {self.batch_in_epoch}, step {self.step}")
 
@@ -272,11 +288,15 @@ class Trainer:
         with torch.no_grad():
             feats = self.model.encode(rgb)          # frozen encoder
         out = self.model.decode(feats, rgb.shape[-2:])
-        pred = F.interpolate(out.float(), size=gt.shape[-2:], mode="bilinear", align_corners=False)
-        pred = self.model.to_depth(pred, MIN_DEPTH, self.cap).clamp(MIN_DEPTH, self.cap)
+        pred = self._depth(out, gt.shape[-2:]).clamp(MIN_DEPTH, self.cap)
         valid = (gt > MIN_DEPTH) & (gt < self.cap)
         loss = silog_loss(pred, gt, valid)
         return loss, {"loss": loss.item()}
+
+    def _depth(self, out, hw):
+        """Decoder output -> depth in metres at the ground-truth size ``hw``."""
+        pred = F.interpolate(out.float(), size=tuple(hw), mode="bilinear", align_corners=False)
+        return self.model.to_depth(pred, max_depth=self.cap)
 
     def fit(self):
         cfg = self.cfg
@@ -292,7 +312,7 @@ class Trainer:
                                 num_workers=cfg.num_workers, pin_memory=self.device.type == "cuda",
                                 drop_last=True, worker_init_fn=seed_worker, persistent_workers=False)
             self.model.train()
-            sums, n, t0 = {}, 0, time.time()
+            t0 = time.time()
             for batch in loader:
                 if self.batch_in_epoch >= bpe:
                     break
@@ -308,9 +328,9 @@ class Trainer:
                 self.scaler.update()
                 self.step += 1
                 self.batch_in_epoch += 1
-                n += 1
+                self.n += 1
                 for k, v in logs.items():
-                    sums[k] = sums.get(k, 0.0) + v
+                    self.sums[k] = self.sums.get(k, 0.0) + v
                 if self.step % cfg.log_every == 0:
                     print(f"[train] epoch {self.epoch} batch {self.batch_in_epoch}/{bpe} " +
                           " ".join(f"{k} {v:.4f}" for k, v in logs.items()))
@@ -318,11 +338,14 @@ class Trainer:
                     _save_atomic(self._state(), self.last_ckpt)
                     t_ckpt = time.time()
             row = {"epoch": self.epoch, "step": self.step, "lr": self.opt.param_groups[0]["lr"],
-                   "seconds": round(time.time() - t0, 1), **{f"train_{k}": v / max(n, 1) for k, v in sums.items()}}
-            if self.val_set is not None:
-                row.update({f"val_{k}": v for k, v in self.evaluate(self.val_set, ("median",))["median"].items()})
+                   "seconds": round(time.time() - t0, 1), **{f"train_{k}": v / max(self.n, 1) for k, v in self.sums.items()}}
+            if self.val_set is not None:       # same columns every epoch: empty when the epoch is not validated
+                run_val = (self.epoch + 1) % cfg.val_every == 0 or self.epoch + 1 == self.epochs
+                val = self.evaluate(self.val_set, ("median",))["median"] if run_val else dict.fromkeys(METRICS, "")
+                row.update({f"val_{k}": v for k, v in val.items()})
             self.sched.step()
             self.epoch, self.batch_in_epoch = self.epoch + 1, 0
+            self.sums, self.n = {}, 0
             append_csv_row(row, self.dir / "metrics.csv")
             print("[epoch] " + " ".join(f"{k} {v:.4g}" if isinstance(v, float) else f"{k} {v}" for k, v in row.items()))
             _save_atomic(self._state(), self.last_ckpt)
@@ -342,8 +365,7 @@ class Trainer:
             rgb, gt = dataset[i]
             with autocast(self.device, self.precision):
                 out = self.model.decode(self.model.encode(rgb[None].to(self.device)), rgb.shape[-2:])
-            pred = F.interpolate(out.float(), size=gt.shape[-2:], mode="bilinear", align_corners=False)
-            pred = self.model.to_depth(pred, MIN_DEPTH, self.cap)[0, 0].cpu()
+            pred = self._depth(out, gt.shape[-2:])[0, 0].cpu()
             for a in alignments:
                 per[a].append(depth_metrics(pred, gt[0], self.cfg.dataset, a))
         self.model.train()
@@ -362,5 +384,5 @@ def evaluate_run(cfg: RunConfig, test_list: str, weights: str | None = None) -> 
     tr.model.load_state_dict(torch.load(weights or run_dir / "model.pt", map_location="cpu", weights_only=True))
     test = DepthPairs(_resolve(test_list), paths.data_root(), cfg.image_size, DEPTH_SCALE[cfg.dataset])
     res = tr.evaluate(test)
-    save_json({"test_list": str(test_list), "n": len(test), **res}, run_dir / "test_metrics.json")
+    save_json({"test_list": str(test_list), "n": len(test), **res}, run_dir / f"test_metrics_{Path(test_list).stem}.json")
     return res
