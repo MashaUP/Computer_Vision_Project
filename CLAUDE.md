@@ -1,0 +1,35 @@
+# Lean Geometry
+
+LeJEPA (SIGReg) self-supervised pre-training vs random init for lightweight depth encoders
+(FlexDepth, ZipDepth, BoRe-Depth, METER), on NYU Depth V2 and KITTI. Overview in `README.md`,
+experimental protocol in `docs/protocol.md`.
+
+## Setup
+- Local: `.venv` with Python 3.12; `pip install torch torchvision` from PyPI, then `pip install '.[test]'`.
+- Third-party code lives in submodules: `git submodule update --init --recursive`.
+- Lab machine (ALCOR, Podman): see `docs/alcor.md`.
+
+## Commands
+- `python -m pytest -q` (CPU only, ~3 min)
+- `python main.py check [--device cuda|mps] [--models ...]`: smoke test of encoders + both LeJEPA recipes
+- `python main.py pretrain|finetune|evaluate --config configs/runs/<file>.yaml --set key=value`
+
+## Hard rules
+- `sota/` is pinned third-party code: NEVER modify it. Adapt in `models/baselines.py` or the callers of `sota/loader.py`.
+- `models/meter.py` is METER from phase 1: do not change it without asking.
+- Training is always fp32. Never bf16 (SIGReg diverges).
+- Pre-training and fine-tuning use the full NYU raw set, not only the 795 labeled frames.
+- The NYU val list is still to be defined, after the raw depth alignment (scenes excluded from train and test).
+
+## Conventions
+- Run configs: YAML in `configs/runs/`. LeJEPA recipes: `configs/lejepa/`. Unknown keys are an error in both
+  (`RunConfig`, recipes); resume refuses a config that differs from the stored one.
+- Data, runs and caches stay outside the repo: `LG_DATA_ROOT`, `LG_RUNS_ROOT`, `LG_CACHE_ROOT`.
+- `to_depth` uses min depth 0.1 m (Monodepth2 convention); `MIN_DEPTH=1e-3` is only for metrics and clamping.
+- Tests must run on CPU; add a test for any risky logic.
+
+## Open items
+- Step-3 loss (photometric vs ground truth) not decided.
+- Public-weights loader (step 1) missing.
+- KITTI preparation: zip layout unverified, see the `shortcut:` comment in `data/download/download_kitti.py`.
+- `make_views` takes ~65% of a training step on CPU; not measured on GPU yet.
