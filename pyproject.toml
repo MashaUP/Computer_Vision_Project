@@ -25,6 +25,8 @@ dependencies = [
 
 [project.optional-dependencies]
 test = ["pytest"]
+# imports of the original FlexDepth trainer (sota/flexdepth/trainer.py); wandb is imported but only used with --use_wb
+flexdepth-train = ["tensorboardX", "wandb", "prefetch_generator", "scikit-image", "six", "thop", "ultralytics"]
 
 # Code runs from the repository root (no installed package): `pip install .` only installs the dependencies.
 [tool.setuptools]

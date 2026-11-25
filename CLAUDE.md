@@ -13,13 +13,16 @@ experimental protocol in `docs/protocol.md`.
 - `python -m pytest -q` (CPU only, ~3 min)
 - `python main.py check [--device cuda|mps] [--models ...]`: smoke test of encoders + both LeJEPA recipes
 - `python main.py pretrain|finetune|evaluate --config configs/runs/<file>.yaml --set key=value`
+- FlexDepth on NYU (original trainer, needs CUDA + `pip install '.[flexdepth-train]'`):
+  `python scripts/train_flexdepth_nyu.py --name flexdepth_n_nyu [-- <extra FlexDepth options>]`
 
 ## Hard rules
 - `sota/` is pinned third-party code: NEVER modify it. Adapt in `models/baselines.py` or the callers of `sota/loader.py`.
 - `models/meter.py` is METER from phase 1: do not change it without asking.
 - Training is always fp32. Never bf16 (SIGReg diverges).
 - Pre-training and fine-tuning use the full NYU raw set, not only the 795 labeled frames.
-- The NYU val list is still to be defined, after the raw depth alignment (scenes excluded from train and test).
+- NYU validation = ~5% of the non-test raw scenes (chosen by a hash of the scene id, so it never depends on which scenes are on disk; `data.datasets.check_list` rejects lists containing test or val scenes), excluded from LeJEPA pre-training (`frames`), train (`triplets`) and the 654 test scenes:
+  `python -m data.download.nyu triplets` writes `nyu_raw_val_scenes.txt` and the train/val frame triplets.
 
 ## Conventions
 - Run configs: YAML in `configs/runs/`. LeJEPA recipes: `configs/lejepa/`. Unknown keys are an error in both
@@ -29,6 +32,8 @@ experimental protocol in `docs/protocol.md`.
 - Tests must run on CPU; add a test for any risky logic.
 
 ## Open items
+- `train_flexdepth_nyu.py`: GPU run and the COCO-pretrained weights path not yet exercised; the lab needs network for the
+  YOLO11 and ImageNet ResNet-18 (pose net) weights.
 - Step-3 loss (photometric vs ground truth) not decided.
 - Public-weights loader (step 1) missing.
 - KITTI preparation: zip layout unverified, see the `shortcut:` comment in `data/download/download_kitti.py`.

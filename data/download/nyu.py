@@ -3,14 +3,16 @@
     python -m data.download.nyu download          # labeled .mat + official splits + all 37 raw parts (~431 GB)
     python -m data.download.nyu extract-labeled   # 1449 labelled frames -> PNGs + train (795) / test (654) lists
     python -m data.download.nyu extract-raw       # unzip the raw parts (add --delete-zip to free space)
-    python -m data.download.nyu frames            # RGB frame list for LeJEPA, test scenes excluded
+    python -m data.download.nyu frames            # RGB frame list for LeJEPA, test + validation scenes excluded
+    python -m data.download.nyu triplets          # validation scenes + frame triplets (FlexDepth self-supervised training)
 
 Everything goes under ``<data root>/nyu`` (``LG_DATA_ROOT``, ``/mnt/hdd2/<user>/data`` on the lab):
 
     nyu/downloads/   nyu_depth_v2_labeled.mat, splits.mat, <part>.zip     (resumable, size-checked)
     nyu/raw/         <scene>/r-*.ppm (RGB), d-*.pgm (raw depth), a-*.dump, INDEX.txt
     nyu/labeled/     {train,test}/<index>_{rgb,depth}.png   (depth: uint16 millimetres)
-    ../splits/       nyu_labeled_{train,test}.txt, nyu_test_scenes.txt, nyu_raw_frames_stride<k>.txt
+    ../splits/       nyu_labeled_{train,test}.txt, nyu_test_scenes.txt, nyu_raw_frames_stride<k>.txt,
+                     nyu_raw_val_scenes.txt, nyu_raw_triplets_{train,val}.txt
 
 Downloads resume where they stopped (HTTP range requests; the NYU server supports them) and are
 checked against the size the server reports, so the command can simply be re-run after an
@@ -21,6 +23,7 @@ interruption. Launch it in a CPU container on the lab machine:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import re
 import sys
 import time
@@ -49,6 +52,9 @@ RAW_PARTS = [
 ]
 RAW_URLS = [f"{BASE}/nyu_depth_v2/{p}.zip" for p in RAW_PARTS]
 CHUNK = 4 << 20
+VAL_SCENE_FRACTION = 0.05   # share of the non-test scenes held out as the protocol's validation set (by id hash)
+TRIPLET_STEP = 10           # raw frames between source and target: MonoIndoor subsamples the raw video 10x in time
+MAX_GAP_S = 1.0             # drop triplets with a longer gap: at 20-30 FPS a 10-frame step is 0.33-0.5 s (our threshold)
 
 
 def nyu_root() -> Path:
@@ -179,6 +185,9 @@ def cmd_extract_labeled(_) -> int:
         lists[part].append(f"nyu/labeled/{part}/{i:04d}_rgb.png nyu/labeled/{part}/{i:04d}_depth.png {scene}")
         if part == "test":
             test_scenes.add(scene_id(scene))
+    shared = {scene_id(ln.split()[2]) for ln in lists["train"]} & test_scenes
+    if shared:
+        raise SystemExit(f"labelled train and test share scenes: {sorted(shared)}")
     splits_dir().mkdir(parents=True, exist_ok=True)
     for part, lines in lists.items():
         (splits_dir() / f"nyu_labeled_{part}.txt").write_text("\n".join(lines) + "\n")
@@ -208,16 +217,32 @@ def cmd_extract_raw(args) -> int:
     return 0
 
 
-def cmd_frames(args) -> int:
-    """List RGB frames of the raw sequences, every ``stride``-th per scene, test scenes excluded."""
-    raw = nyu_root() / "raw"
+def is_val_scene(sid: str) -> bool:
+    """Validation scene? Decided by the scene id alone (hash), so it never depends on which other scenes are on disk."""
+    return int(hashlib.sha1(sid.encode()).hexdigest(), 16) % 100 < 100 * VAL_SCENE_FRACTION
+
+
+def raw_scenes():
+    """``(raw scene folders, test scene ids, validation scene ids)``; validation = the non-test scenes with
+    ``is_val_scene``. Shared by ``frames`` and ``triplets``; also written to ``nyu_raw_val_scenes.txt``."""
     test_file = splits_dir() / "nyu_test_scenes.txt"
     if not test_file.exists():
         raise SystemExit("run extract-labeled first: it writes the test scenes to exclude")
     test = set(test_file.read_text().split())
+    scenes = sorted(p for p in (nyu_root() / "raw").rglob("*") if p.is_dir() and any(p.glob("r-*.ppm")))
+    val = {i for i in {scene_id(p.name) for p in scenes} - test if is_val_scene(i)}
+    if not val:
+        raise SystemExit("no scene falls in the validation set: the raw download looks incomplete")
+    (splits_dir() / "nyu_raw_val_scenes.txt").write_text("\n".join(sorted(val)) + "\n")
+    return scenes, test, val
+
+
+def cmd_frames(args) -> int:
+    """List RGB frames of the raw sequences, every ``stride``-th per scene, test and validation scenes excluded."""
+    scenes, test, val = raw_scenes()
     lines, kept, dropped = [], 0, 0
-    for scene in sorted(p for p in raw.rglob("*") if p.is_dir() and any(p.glob("r-*.ppm"))):
-        if scene_id(scene.name) in test:
+    for scene in scenes:
+        if scene_id(scene.name) in test | val:
             dropped += 1
             continue
         kept += 1
@@ -225,7 +250,38 @@ def cmd_frames(args) -> int:
         lines += [str(f.relative_to(paths.data_root())) for f in frames]
     out = splits_dir() / f"nyu_raw_frames_stride{args.stride}.txt"
     out.write_text("\n".join(lines) + "\n")
-    print(f"{len(lines)} frames from {kept} scenes ({dropped} test scenes excluded) -> {out}")
+    print(f"{len(lines)} frames from {kept} scenes ({dropped} test/val scenes excluded) -> {out}")
+    return 0
+
+
+def frame_time(path) -> float:
+    """Timestamp (seconds) of ``r-<seconds.fraction>-<counter>.ppm``."""
+    return float(re.match(r"r-(\d+(?:\.\d+)?)", Path(path).name).group(1))
+
+
+def cmd_triplets(args) -> int:
+    """Validation scenes + (previous, target, next) frame triplets for self-supervised training.
+
+    Targets and sources are ``--step`` frames apart (the raw video subsampled in time) and never cross
+    a scene or a timestamp jump. Test scenes are excluded from everything; ``VAL_SCENE_FRACTION`` of the
+    remaining scenes (by id, seed 0) go to ``nyu_raw_triplets_val.txt``, the rest to ``..._train.txt``.
+    """
+    scenes, test, val = raw_scenes()
+    lines = {"train": [], "val": []}
+    for scene in scenes:
+        sid = scene_id(scene.name)
+        if sid in test:
+            continue
+        frames = sorted(scene.glob("r-*.ppm"), key=frame_time)
+        t = [frame_time(f) for f in frames]
+        rel = [str(f.relative_to(paths.data_root())) for f in frames]
+        for i in range(args.step, len(frames) - args.step, args.step):
+            if t[i] - t[i - args.step] <= args.max_gap and t[i + args.step] - t[i] <= args.max_gap:
+                lines["val" if sid in val else "train"].append(f"{rel[i - args.step]} {rel[i]} {rel[i + args.step]}")
+    splits_dir().mkdir(parents=True, exist_ok=True)
+    for part, ls in lines.items():
+        (splits_dir() / f"nyu_raw_triplets_{part}.txt").write_text("\n".join(ls) + ("\n" if ls else ""))
+    print(f"{len(lines['train'])} train / {len(lines['val'])} val triplets; {len(val)} scenes held out for validation")
     return 0
 
 
@@ -243,6 +299,10 @@ def main(argv=None) -> int:
     p = sub.add_parser("frames")
     p.add_argument("--stride", type=int, default=10)
     p.set_defaults(func=cmd_frames)
+    p = sub.add_parser("triplets", help="validation scenes and frame triplets for self-supervised training")
+    p.add_argument("--step", type=int, default=TRIPLET_STEP)
+    p.add_argument("--max-gap", type=float, default=MAX_GAP_S, help="seconds")
+    p.set_defaults(func=cmd_triplets)
     args = ap.parse_args(argv)
     return args.func(args)
 

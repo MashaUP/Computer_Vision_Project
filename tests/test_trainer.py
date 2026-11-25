@@ -154,3 +154,30 @@ def test_depth_conversion_uses_the_default_min_depth():
 def test_deepest_channels_on_the_model_device():
     """The probe image is created where the parameters are (it crashed on GPU/MPS)."""
     assert build_model("meter").to("meta").deepest_channels() == 160
+
+
+def test_check_list_rejects_test_and_val_scenes(tmp_path, monkeypatch, capsys):
+    from data.datasets import check_list
+    monkeypatch.setenv("LG_DATA_ROOT", str(tmp_path))
+    (tmp_path / "splits").mkdir()
+    lst = tmp_path / "frames.txt"
+    lst.write_text("nyu/raw/kitchen_0001a/r-1000.1-1.ppm\nnyu/raw/office_0003/r-1000.2-2.ppm\n")
+    check_list(lst, "nyu", "pretrain")                                     # no split files: warns, does not fail
+    assert "missing" in capsys.readouterr().out
+    (tmp_path / "splits/nyu_test_scenes.txt").write_text("kitchen_0001\n")
+    (tmp_path / "splits/nyu_raw_val_scenes.txt").write_text("office_0003\n")
+    with pytest.raises(ValueError, match="kitchen_0001"):
+        check_list(lst, "nyu", "val")                                      # val role: only the test scenes are banned
+    lst.write_text("nyu/raw/office_0003/r-1000.2-2.ppm\n")
+    check_list(lst, "nyu", "val")
+    with pytest.raises(ValueError, match="office_0003"):
+        check_list(lst, "nyu", "train")
+    lab = tmp_path / "labeled.txt"                                         # labelled pairs: the scene is the 3rd column
+    lab.write_text("nyu/labeled/train/0001_rgb.png nyu/labeled/train/0001_depth.png office_0003a\n")
+    with pytest.raises(ValueError, match="office_0003"):
+        check_list(lab, "nyu", "train")
+    other = tmp_path / "other.txt"
+    other.write_text("some/path.png other/depth.png\n")
+    check_list(other, "nyu", "train")
+    assert "do not name their scene" in capsys.readouterr().out
+    check_list(lst, "kitti", "train")                                      # KITTI: not checked yet

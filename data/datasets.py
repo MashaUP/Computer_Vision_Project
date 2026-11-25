@@ -26,6 +26,47 @@ def read_list(path: str | Path) -> list[list[str]]:
     return [ln for ln in lines if ln and not ln[0].startswith("#")]
 
 
+def _nyu_scene(tokens: list[str]) -> str | None:
+    """Scene of a list line, or None. Raw frame / triplet: folder of the first path; labelled pair: 3rd column."""
+    from data.download.nyu import scene_id
+
+    first = Path(tokens[0])
+    if first.name.startswith("r-") and first.suffix == ".ppm":
+        return scene_id(first.parent.name)
+    if len(tokens) >= 3 and "/" not in tokens[2]:
+        return scene_id(tokens[2])
+    return None
+
+
+def check_list(path: str | Path, dataset: str, role: str) -> None:
+    """Refuse a NYU list that contains test scenes (any role) or validation scenes (train, bn, pretrain).
+
+    ``role``: train | val | bn | pretrain. Skips with a warning when the split files are missing or the lines
+    do not name their scene. KITTI: not checked yet.
+    """
+    if dataset != "nyu":
+        return
+    from utils import paths
+
+    splits = paths.data_root() / "splits"
+    banned = {}
+    for name, roles in (("nyu_test_scenes.txt", {"train", "val", "bn", "pretrain"}),
+                        ("nyu_raw_val_scenes.txt", {"train", "bn", "pretrain"})):
+        if role not in roles:
+            continue
+        f = splits / name
+        if f.exists():
+            banned.update({s: name for s in f.read_text().split()})
+        else:
+            print(f"[check_list] warning: {f} missing, {role} list {path} not checked against it")
+    scenes = [_nyu_scene(t) for t in read_list(path)]
+    if None in scenes:
+        print(f"[check_list] warning: {scenes.count(None)} lines of {path} do not name their scene, not checked")
+    bad = sorted({s for s in scenes if s in banned})
+    if bad:
+        raise ValueError(f"{path} ({role}) contains scenes from {sorted({banned[s] for s in bad})}: {bad[:5]}")
+
+
 def load_rgb(path: Path) -> torch.Tensor:
     """(3, H, W) float in [0, 1]."""
     return torch.from_numpy(np.asarray(Image.open(path).convert("RGB"), dtype=np.float32) / 255.0).permute(2, 0, 1)

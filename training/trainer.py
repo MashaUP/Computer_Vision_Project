@@ -33,7 +33,7 @@ import torch.nn.functional as F
 import yaml
 from torch.utils.data import DataLoader, Dataset, Sampler
 
-from data.datasets import DepthPairs, ImageList
+from data.datasets import DepthPairs, ImageList, check_list
 from evaluation.metrics import CAPS, METRICS, MIN_DEPTH, depth_metrics, mean_metrics
 from models.baselines import build_model
 from training.lejepa import LeJEPALoss, lejepa_step, load_recipe
@@ -211,6 +211,7 @@ class Trainer:
         self.lr, self.wd = self._hp("lr", self.recipe.lr), self._hp("weight_decay", self.recipe.weight_decay)
         self.epochs, self.warmup = self._hp("epochs", self.recipe.epochs), self._hp("warmup_epochs", self.recipe.warmup_epochs)
         self.eta_min_ratio = self._hp("eta_min_ratio", self.recipe.eta_min_ratio)
+        check_list(_resolve(cfg.train_list), cfg.dataset, "pretrain")
         self.train_set: Dataset = ImageList(_resolve(cfg.train_list), paths.data_root(), cfg.image_size)
         self.val_set = None
 
@@ -219,6 +220,9 @@ class Trainer:
         if cfg.loss != "silog":
             raise NotImplementedError("photometric step-3 loss: pending the decision on option (A)")
         scale = DEPTH_SCALE[cfg.dataset]
+        check_list(_resolve(cfg.train_list), cfg.dataset, "train")
+        if cfg.val_list:
+            check_list(_resolve(cfg.val_list), cfg.dataset, "val")
         self.train_set = DepthPairs(_resolve(cfg.train_list), paths.data_root(), cfg.image_size, scale,
                                     crop=cfg.crop, train=True)
         self.val_set = (DepthPairs(_resolve(cfg.val_list), paths.data_root(), cfg.image_size, scale)
@@ -240,6 +244,7 @@ class Trainer:
         elif cfg.init == "random":
             if cfg.bn_list is None:
                 print("[bn] warning: no bn_list, using the RGB frames of train_list (not unlabelled frames)")
+            check_list(_resolve(cfg.bn_list or cfg.train_list), cfg.dataset, "bn")
             frames = ImageList(_resolve(cfg.bn_list or cfg.train_list), paths.data_root(), cfg.image_size)
             frames.items = [it[:1] for it in frames.items]
             loader = DataLoader(frames, batch_size=self.cfg.batch_size, shuffle=True, num_workers=cfg.num_workers,
