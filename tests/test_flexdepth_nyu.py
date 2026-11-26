@@ -54,6 +54,20 @@ def test_one_step_on_synthetic_nyu(tmp_path, monkeypatch):
                  "--data_path", str(data), "--log_dir", str(tmp_path / "runs/t"), "--model_name", "m", *extra]
     with script.build(flex_argv) as (_, NYUTrainer, opts):
         trainer = NYUTrainer(opts, data / "splits/train.txt", data / "splits/val.txt")
+        ds = trainer.train_dataset
+        from_ppm = [np.asarray(ds.get_color(0, j, None, False)) for j in (-1, 0, 1)]
+        n = script.make_png([data / "splits/train.txt", data / "splits/val.txt"], data, workers=1)
+        pngs = sorted((data / "nyu/rect").rglob("*.png"))
+        assert n == len(pngs) == 12 and not list((data / "nyu/rect").rglob("*.tmp.png"))
+        from_png = [np.asarray(ds.get_color(0, j, None, False)) for j in (-1, 0, 1)]
+        assert all(np.array_equal(a, b) for a, b in zip(from_ppm, from_png)) and from_png[0].shape == (448, 608, 3)
+        mtimes = [p.stat().st_mtime_ns for p in pngs]
+        assert script.make_png([data / "splits/train.txt"], data, workers=2) == 0     # resume: nothing rewritten
+        assert [p.stat().st_mtime_ns for p in pngs] == mtimes
+        bad = data / "splits/bad.txt"
+        bad.write_text("nyu/raw/scene_0001/missing.ppm\n")
+        with pytest.raises(RuntimeError, match="missing.ppm"):
+            script.make_png([bad], data, workers=1)
         inputs = next(iter(trainer.train_loader))
         assert inputs[("color_aug", 0, 0)].shape == (2, 3, 96, 128) and set(k for k in inputs if k[0] == "color") >= {("color", -1, 0)}
         trainer.set_train()
