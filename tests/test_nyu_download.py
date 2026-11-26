@@ -104,6 +104,17 @@ def test_extract_labeled_rejects_scene_in_train_and_test(tmp_path, monkeypatch):
         nyu.cmd_extract_labeled(None)
 
 
+PPM = b"P6\n2 2\n255\n" + bytes(12)                                          # a valid 2x2 binary PPM
+
+
+def test_ppm_ok_rejects_truncated_and_broken_frames(tmp_path):
+    good, short, broken = tmp_path / "a.ppm", tmp_path / "b.ppm", tmp_path / "c.ppm"
+    good.write_bytes(PPM)
+    short.write_bytes(PPM[:-3])
+    broken.write_bytes(b"P6\n2" + bytes(20))
+    assert nyu.ppm_ok(good) and not nyu.ppm_ok(short) and not nyu.ppm_ok(broken)
+
+
 def test_val_scene_does_not_depend_on_other_scenes():
     ids = [f"bedroom_{n:04d}" for n in range(1, 465)]
     val = {i for i in ids if nyu.is_val_scene(i)}
@@ -118,14 +129,14 @@ def test_frames_excludes_test_and_val_scenes(tmp_path, monkeypatch):
         d = tmp_path / "nyu/raw" / scene
         d.mkdir(parents=True)
         for k in range(25):
-            (d / f"r-{k:04d}.ppm").write_bytes(b"")
+            (d / f"r-{k:04d}.ppm").write_bytes(PPM[:-1] if (scene, k) == (keep, 10) else PPM)  # one truncated frame
     (tmp_path / "splits").mkdir()
     (tmp_path / "splits/nyu_test_scenes.txt").write_text("kitchen_0001\n")
     import argparse
     nyu.cmd_frames(argparse.Namespace(stride=10))
     lines = (tmp_path / "splits/nyu_raw_frames_stride10.txt").read_text().split()
     _, _, val = nyu.raw_scenes()
-    assert val == {held} and len(lines) == 3                                   # 2 non-test scenes, 1 held out for validation
+    assert val == {held} and len(lines) == 2                                   # 3 sampled frames of the kept scene, 1 truncated
     assert not any("kitchen" in ln or next(iter(val)) in ln for ln in lines)
 
 
@@ -139,7 +150,7 @@ def test_triplets_split_scenes_and_skip_gaps(tmp_path, monkeypatch):
         if scene == keep:
             times = times[:20] + [t + 30.0 for t in times[20:]]                  # a sync jump after frame 19
         for k, t in enumerate(times):
-            (d / f"r-{1000 + t:.6f}-{k:010d}.ppm").write_bytes(b"")
+            (d / f"r-{1000 + t:.6f}-{k:010d}.ppm").write_bytes(PPM[:-1] if (scene, k) == (held, 30) else PPM)
     (tmp_path / "splits").mkdir()
     (tmp_path / "splits/nyu_test_scenes.txt").write_text("kitchen_0001\n")
     import argparse
@@ -151,5 +162,6 @@ def test_triplets_split_scenes_and_skip_gaps(tmp_path, monkeypatch):
     rows = train + valt
     assert not any("kitchen" in r for r in rows) and all(len(r.split()) == 3 for r in rows)
     assert all((val[0] in r) for r in valt) and not any(val[0] in r for r in train)
-    # held scene: targets 10, 20, 30 -> 3 triplets; kept scene: only the target whose sources stay on one side of the jump
-    assert len(valt) == 3 and len(train) == 1
+    # held scene: targets 10, 20, 30, minus 20 and 30 (frame 30 truncated) -> 1; kept scene: only the target whose
+    # sources stay on one side of the jump
+    assert len(valt) == 1 and len(train) == 1

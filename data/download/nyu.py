@@ -237,6 +237,13 @@ def raw_scenes():
     return scenes, test, val
 
 
+def ppm_ok(path) -> bool:
+    """False for a truncated or unreadable binary PPM (some NYU raw frames are truncated in the official zips)."""
+    with open(path, "rb") as fh:
+        m = re.match(rb"P6\s+(\d+)\s+(\d+)\s+(\d+)\s", fh.read(64))
+    return bool(m) and Path(path).stat().st_size == m.end() + int(m[1]) * int(m[2]) * 3
+
+
 def cmd_frames(args) -> int:
     """List RGB frames of the raw sequences, every ``stride``-th per scene, test and validation scenes excluded."""
     scenes, test, val = raw_scenes()
@@ -246,7 +253,7 @@ def cmd_frames(args) -> int:
             dropped += 1
             continue
         kept += 1
-        frames = sorted(scene.glob("r-*.ppm"))[::args.stride]
+        frames = [f for f in sorted(scene.glob("r-*.ppm"))[::args.stride] if ppm_ok(f)]
         lines += [str(f.relative_to(paths.data_root())) for f in frames]
     out = splits_dir() / f"nyu_raw_frames_stride{args.stride}.txt"
     out.write_text("\n".join(lines) + "\n")
@@ -275,8 +282,10 @@ def cmd_triplets(args) -> int:
         frames = sorted(scene.glob("r-*.ppm"), key=frame_time)
         t = [frame_time(f) for f in frames]
         rel = [str(f.relative_to(paths.data_root())) for f in frames]
+        ok = [ppm_ok(f) for f in frames]
         for i in range(args.step, len(frames) - args.step, args.step):
-            if t[i] - t[i - args.step] <= args.max_gap and t[i + args.step] - t[i] <= args.max_gap:
+            s = args.step
+            if t[i] - t[i - s] <= args.max_gap and t[i + s] - t[i] <= args.max_gap and ok[i - s] and ok[i] and ok[i + s]:
                 lines["val" if sid in val else "train"].append(f"{rel[i - args.step]} {rel[i]} {rel[i + args.step]}")
     splits_dir().mkdir(parents=True, exist_ok=True)
     for part, ls in lines.items():
