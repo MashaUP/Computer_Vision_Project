@@ -11,7 +11,7 @@ requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Andrea Masciarelli" }, { name = "Luca Zualdi" }]
 # torch / torchvision are installed separately, from the wheel index that matches the GPU:
-# cu126 for Pascal (GTX 1080 / 1080 Ti, PyTorch <= 2.14), cu130 for newer GPUs. See docker/Dockerfile.
+# cu118 for the lab (driver 470 -> CUDA 11.4, PyTorch <= 2.7.1), cu130 for newer GPUs. See docker/Dockerfile.
 dependencies = [
     "lejepa @ git+https://github.com/galilai-group/lejepa.git@c293d29",
     "numpy",

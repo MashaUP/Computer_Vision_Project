@@ -28,7 +28,7 @@ utils/             device/precision policy, seeding, paths, result I/O
 training/          LeJEPA objective (classic | dense), step-3 loss, trainer with resume
 evaluation/        protocol metrics (crops, caps, median / scale-shift alignment)
 configs/           recipes (configs/lejepa/classic.yaml, dense.yaml)
-docker/            Dockerfile (cu126 for the lab GPUs, cu130 for an RTX 5070)
+docker/            Dockerfile (cu118 for the lab GPUs, cu130 for an RTX 5070)
 scripts/alcor/     build, run and clean up containers on the ALCOR machines
 tests/             CPU tests (pytest)
 results/           small final tables only; phase-1 results in results/phase1_meter/

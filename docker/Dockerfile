@@ -1,16 +1,17 @@
 # Project image: masciarelli/masciarelli_schiavella (ALCOR naming: cognomestudente_cognomesupervisore).
 #
-# One Dockerfile, two CUDA builds of the same PyTorch version:
-#   lab, GTX 1080 / 1080 Ti (Pascal, sm_61):  --build-arg CUDA=cu126   (default)
-#   local, RTX 5070 (Blackwell, sm_120):      --build-arg CUDA=cu130   (needs a host driver for CUDA 13)
-# PyTorch 2.14 is the last release with cu126 wheels, i.e. the last one that supports Pascal.
+# One Dockerfile, two CUDA builds:
+#   lab, GTX 1080 / 1080 Ti (Pascal, sm_61):  --build-arg CUDA=cu118 --build-arg TORCH=2.7.1   (default)
+#   local, RTX 5070 (Blackwell, sm_120):      --build-arg CUDA=cu130 --build-arg TORCH=2.14.*  (needs a host driver for CUDA 13)
+# Pascal would also run cu126, but the lab driver (470) only reaches CUDA 11.4; minor-version
+# compatibility stretches that to cu118, and PyTorch 2.7.1 is the last release with cu118 wheels.
 # The PyTorch wheels ship their own CUDA runtime: the host only provides the driver (via CDI).
 #
 # Build from the repository root:  scripts/alcor/build.sh   (or: podman build -f docker/Dockerfile .)
 FROM docker.io/library/python:3.12-slim
 
-ARG CUDA=cu126
-ARG TORCH=2.14.*
+ARG CUDA=cu118
+ARG TORCH=2.7.1
 
 ENV PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \

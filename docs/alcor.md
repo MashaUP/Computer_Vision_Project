@@ -26,7 +26,7 @@ cd /mnt/hdd2/$USER
 git clone --recurse-submodules https://github.com/MashaUP/Computer_Vision_Project.git
 cd Computer_Vision_Project
 podman login docker.io -u <dockerhub-user>     # once
-PUSH=1 scripts/alcor/build.sh                  # builds docker.io/masciarelli/masciarelli_schiavella:latest (cu126)
+PUSH=1 scripts/alcor/build.sh                  # builds docker.io/masciarelli/masciarelli_schiavella:latest (cu118)
 scripts/alcor/run.sh cpu check python3 main.py check     # CPU: no booking needed
 podman logs -f check
 ```
