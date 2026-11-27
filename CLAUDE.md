@@ -13,6 +13,7 @@ experimental protocol in `docs/protocol.md`.
 - `python -m pytest -q` (CPU only, ~3 min)
 - `python main.py check [--device cuda|mps] [--models ...]`: smoke test of encoders + both LeJEPA recipes
 - `python main.py pretrain|finetune|evaluate --config configs/runs/<file>.yaml --set key=value`
+- `python main.py eval-public --model flexdepth|zipdepth|bore --dataset nyu|kitti --weights <path> --test-list splits/nyu_labeled_test.txt`
 - FlexDepth on NYU (original trainer, needs CUDA + `pip install '.[flexdepth-train]'`):
   `python scripts/train_flexdepth_nyu.py --name flexdepth_n_nyu [-- <extra FlexDepth options>]`
 
@@ -35,6 +36,5 @@ experimental protocol in `docs/protocol.md`.
 - `train_flexdepth_nyu.py`: GPU run and the COCO-pretrained weights path not yet exercised; the lab needs network for the
   YOLO11 and ImageNet ResNet-18 (pose net) weights.
 - Step-3 loss (photometric vs ground truth) not decided.
-- Public-weights loader (step 1) missing.
 - KITTI preparation: zip layout unverified, see the `shortcut:` comment in `data/download/download_kitti.py`.
 - `make_views` takes ~65% of a training step on CPU; not measured on GPU yet.

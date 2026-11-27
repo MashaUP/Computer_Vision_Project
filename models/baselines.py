@@ -75,7 +75,19 @@ class FlexDepth(DepthBaseline):
     output_kind = "sigmoid_disparity"
 
     def __init__(self, scale: str = "n"):
-        enc, dec = loader.load_flexdepth(scale)
+        with loader.isolated_import("flexdepth", chdir=True):
+            from options import FlexdepthOptions
+            import networks
+
+            opts_obj = FlexdepthOptions()
+            opts_obj.options = opts_obj.parser.parse_args(
+                ["--encoder_model_type", f"yolo11{scale}-seg", "--decoder_model_type", f"flex{scale}", "--dy_mu"]
+            )
+            opts_obj._apply_decoder_defaults()
+            opts_obj._validate_decoder_options()
+            opt = opts_obj.options
+            enc = networks.YOLOEncoder(False, scale=f"{scale}-seg")
+            dec = networks.FlexDepthDecoder(enc.num_ch_enc, opt.scales, scale=scale, opt=opt)
         super().__init__(enc, dec)
         self.scale = scale
         # FlexDepth's FLOPs profiler forwards torch.empty() through the live encoder: BN running stats can come out NaN

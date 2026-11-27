@@ -36,6 +36,7 @@ from torch.utils.data import DataLoader, Dataset, Sampler
 from data.datasets import DepthPairs, ImageList, check_list
 from evaluation.metrics import CAPS, METRICS, MIN_DEPTH, depth_metrics, mean_metrics
 from models.baselines import build_model
+from models.public_weights import load_public_weights
 from training.lejepa import LeJEPALoss, lejepa_step, load_recipe
 from training.losses import silog_loss
 from utils import paths
@@ -253,7 +254,9 @@ class Trainer:
             n = recalibrate_batchnorm(self.model.encode, self.model.encoder, batches, self.device)
             print(f"[bn] BatchNorm statistics re-estimated on {n} batches of unlabelled frames")
         elif cfg.init == "public":
-            raise NotImplementedError("public weights: loaders come with the step-1 evaluation")
+            if not cfg.encoder_ckpt:
+                raise ValueError("init='public' requires encoder_ckpt")
+            load_public_weights(self.model, cfg.encoder_ckpt, encoder_only=True)
         else:
             raise ValueError(f"unknown init {cfg.init!r}")
 
@@ -390,4 +393,58 @@ def evaluate_run(cfg: RunConfig, test_list: str, weights: str | None = None) -> 
     test = DepthPairs(_resolve(test_list), paths.data_root(), cfg.image_size, DEPTH_SCALE[cfg.dataset])
     res = tr.evaluate(test)
     save_json({"test_list": str(test_list), "n": len(test), **res}, run_dir / f"test_metrics_{Path(test_list).stem}.json")
+    return res
+
+
+DEFAULT_EVAL_SIZE = {"nyu": (256, 320), "kitti": (192, 640)}
+
+
+def evaluate_public(
+    model_name: str,
+    dataset: str,
+    weights: str | Path,
+    test_list: str | Path,
+    *,
+    variant: str | None = None,
+    image_size: tuple[int, int] | list[int] | None = None,
+    device: str = "auto",
+    out_json: str | Path | None = None,
+) -> dict:
+    """Evaluate a public or external checkpoint on a test list using ``evaluation.metrics``."""
+    dev = pick_device(device)
+    model = build_model(model_name, variant).to(dev)
+    meta = load_public_weights(model, weights, encoder_only=False)
+
+    if image_size is not None:
+        size = (int(image_size[0]), int(image_size[1]))
+    elif "height" in meta and "width" in meta:
+        size = (int(meta["height"]), int(meta["width"]))
+    else:
+        size = DEFAULT_EVAL_SIZE[dataset]
+
+    tr = Trainer.__new__(Trainer)
+    tr.cfg = RunConfig(task="finetune", name=f"eval_{model_name}", model=model_name, variant=variant,
+                       dataset=dataset, image_size=list(size), device=device)
+    tr.device = dev
+    tr.precision = precision_for(dev)
+    tr.cap = CAPS[dataset]
+    tr.model = model
+
+    test = DepthPairs(_resolve(str(test_list)), paths.data_root(), size, DEPTH_SCALE[dataset])
+    print(f"[eval-public] {model_name} ({weights}) | {dataset} {size[0]}x{size[1]} | {len(test)} samples | device {dev}")
+    res = tr.evaluate(test)
+    if out_json is not None:
+        save_json(
+            {
+                "model": model_name,
+                "variant": variant,
+                "dataset": dataset,
+                "weights": str(weights),
+                "image_size": list(size),
+                "test_list": str(test_list),
+                "n": len(test),
+                **res,
+            },
+            Path(out_json),
+        )
     return res

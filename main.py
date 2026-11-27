@@ -4,9 +4,10 @@ Commands
   env       Python / PyTorch / CUDA, visible GPUs with the precision each one will use, data and runs roots.
   check     build every model and run one LeJEPA step (classic and dense) on random images.
             Runs on CPU by default, so it needs no GPU booking on the lab machines.
-  pretrain  LeJEPA pre-training of an encoder:   python main.py pretrain --config configs/runs/<run>.yaml
-  finetune  frozen encoder, decoder training:    python main.py finetune --config configs/runs/<run>.yaml
-  evaluate  test metrics of a fine-tuned run:    python main.py evaluate --config ... --test-list ...
+  pretrain     LeJEPA pre-training of an encoder:   python main.py pretrain --config configs/runs/<run>.yaml
+  finetune     frozen encoder, decoder training:    python main.py finetune --config configs/runs/<run>.yaml
+  evaluate     test metrics of a fine-tuned run:    python main.py evaluate --config ... --test-list ...
+  eval-public  test metrics of public/external ckpt: python main.py eval-public --model ... --dataset ... --weights ... --test-list ...
 
 pretrain / finetune / evaluate accept ``--set key=value`` overrides (e.g. ``--set seed=1 epochs=2``).
 Re-running the same pretrain / finetune command resumes from the run's last checkpoint.
@@ -92,6 +93,24 @@ def cmd_evaluate(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_eval_public(args: argparse.Namespace) -> int:
+    from training.trainer import evaluate_public
+
+    res = evaluate_public(
+        args.model,
+        args.dataset,
+        args.weights,
+        args.test_list,
+        variant=args.variant,
+        image_size=args.image_size,
+        device=args.device,
+        out_json=args.out,
+    )
+    for align, m in res.items():
+        print(f"{align:12s} " + " ".join(f"{k} {v:.4f}" for k, v in m.items()))
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -110,6 +129,16 @@ def main(argv: list[str] | None = None) -> int:
             p.add_argument("--test-list", required=True)
             p.add_argument("--weights", default=None, help="model.pt (default: the run's own)")
         p.set_defaults(func=func)
+    ep = sub.add_parser("eval-public", help="evaluate public/external weights on a test list")
+    ep.add_argument("--model", required=True, choices=["flexdepth", "zipdepth", "bore"])
+    ep.add_argument("--variant", default=None)
+    ep.add_argument("--dataset", required=True, choices=["nyu", "kitti"])
+    ep.add_argument("--weights", required=True, help="FlexDepth weights_* dir or ZipDepth/BoRe checkpoint file")
+    ep.add_argument("--test-list", required=True)
+    ep.add_argument("--image-size", nargs=2, type=int, default=None, metavar=("H", "W"))
+    ep.add_argument("--device", default="auto")
+    ep.add_argument("--out", default=None, help="optional JSON output path")
+    ep.set_defaults(func=cmd_eval_public)
     args = parser.parse_args(argv)
     return args.func(args)
 
