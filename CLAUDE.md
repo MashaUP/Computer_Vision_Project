@@ -35,6 +35,6 @@ experimental protocol in `docs/protocol.md`.
 ## Open items
 - `train_flexdepth_nyu.py`: GPU run and the COCO-pretrained weights path not yet exercised; the lab needs network for the
   YOLO11 and ImageNet ResNet-18 (pose net) weights.
-- Step-3 loss (photometric vs ground truth) not decided.
-- KITTI preparation: zip layout unverified, see the `shortcut:` comment in `data/download/download_kitti.py`.
+- Step-3 loss: Option A (photometric self-supervised, `loss: photometric` in `training/trainer.py`) implemented, with ZipDepth `cross_scale.low_to_high` unfrozen with the decoder.
+- KITTI preparation: `data/download/download_kitti.py --make_splits` and `data.datasets.check_list` leak guards are implemented; zip layout on first ALCOR download still unverified.
 - `make_views` takes ~65% of a training step on CPU; not measured on GPU yet.

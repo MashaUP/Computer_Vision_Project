@@ -42,6 +42,10 @@ class DepthBaseline(nn.Module):
         self.encoder.eval()
         return self
 
+    def decoder_parameters(self) -> list[nn.Parameter]:
+        """Trainable parameters in step 3 (override if a small fusion layer lives on the encoder)."""
+        return list(self.decoder.parameters())
+
     def train(self, mode: bool = True) -> "DepthBaseline":
         super().train(mode)
         if self.encoder_frozen:
@@ -126,6 +130,15 @@ class ZipDepth(DepthBaseline):
 
     def to_depth(self, out, min_depth=0.1, max_depth=80.0):
         return 1.0 / (out + 1.0 / max_depth)  # inverse depth, bounded by max_depth
+
+    def freeze_encoder(self) -> "ZipDepth":
+        super().freeze_encoder()
+        # cross_scale.low_to_high (18,432 params) is not reached from the deepest map, so train it with the decoder
+        self.encoder.cross_scale.low_to_high.requires_grad_(True)
+        return self
+
+    def decoder_parameters(self) -> list[nn.Parameter]:
+        return list(self.decoder.parameters()) + list(self.encoder.cross_scale.low_to_high.parameters())
 
 
 class BoReDepth(DepthBaseline):

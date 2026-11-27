@@ -19,6 +19,12 @@ venv/
 *.h5
 *.mat
 
+# Curated reference weights tracked in weights/
+!weights/
+!weights/**/*.pth
+!weights/**/*.pt
+!weights/**/*.ckpt
+
 # Editors / OS
 .vscode/
 .idea/

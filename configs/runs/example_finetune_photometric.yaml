@@ -1,0 +1,19 @@
+# Example: step 3, frozen LeJEPA-dense encoder, decoder trained with photometric self-supervised loss (option A).
+task: finetune
+name: finetune_flexdepth_nyu_dense_photo_seed0
+model: flexdepth
+variant: n
+dataset: nyu
+init: lejepa                # random | lejepa | public
+encoder_ckpt: /work/runs/pretrain_flexdepth_nyu_dense/encoder.pt
+loss: photometric
+smooth_weight: 1.0e-3
+pose_pretrained: true
+train_list: splits/nyu_raw_triplets_train.txt
+val_list: splits/nyu_labeled_val.txt
+image_size: [288, 384]
+epochs: 25
+lr: 1.0e-4
+weight_decay: 1.0e-2
+batch_size: 16
+seed: 0

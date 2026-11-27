@@ -33,12 +33,13 @@ import torch.nn.functional as F
 import yaml
 from torch.utils.data import DataLoader, Dataset, Sampler
 
-from data.datasets import DepthPairs, ImageList, check_list
+from data.datasets import DepthPairs, ImageList, TripletList, check_list
 from evaluation.metrics import CAPS, METRICS, MIN_DEPTH, depth_metrics, mean_metrics
 from models.baselines import build_model
 from models.public_weights import load_public_weights
 from training.lejepa import LeJEPALoss, lejepa_step, load_recipe
 from training.losses import silog_loss
+from training.photometric import PhotometricLoss
 from utils import paths
 from utils.device import autocast, pick_device, precision_for
 from utils.io import append_csv_row, save_json
@@ -64,7 +65,9 @@ class RunConfig:
     # finetune
     init: str = "random"                   # random | lejepa | public
     encoder_ckpt: str | None = None        # lejepa: path to encoder.pt of a pre-training run
-    loss: str = "silog"                    # silog (ground truth); photometric: pending the step-3 decision
+    loss: str = "silog"                    # silog (ground truth, option B) | photometric (self-supervised, option A)
+    smooth_weight: float = 1e-3            # photometric: edge-aware smoothness weight
+    pose_pretrained: bool = True           # photometric: ImageNet ResNet-18 init for PoseNet
     bn_recal_batches: int = 200
     bn_list: str | None = None             # random init: list of unlabelled frames for BatchNorm (default: train_list)
     # optimisation (pretrain: recipe values unless set here)
@@ -218,21 +221,33 @@ class Trainer:
 
     def _setup_finetune(self):
         cfg = self.cfg
-        if cfg.loss != "silog":
-            raise NotImplementedError("photometric step-3 loss: pending the decision on option (A)")
+        if cfg.loss not in ("silog", "photometric"):
+            raise ValueError(f"unknown loss {cfg.loss!r}")
         scale = DEPTH_SCALE[cfg.dataset]
         check_list(_resolve(cfg.train_list), cfg.dataset, "train")
         if cfg.val_list:
             check_list(_resolve(cfg.val_list), cfg.dataset, "val")
-        self.train_set = DepthPairs(_resolve(cfg.train_list), paths.data_root(), cfg.image_size, scale,
-                                    crop=cfg.crop, train=True)
+        if cfg.loss == "photometric":
+            self.train_set = TripletList(_resolve(cfg.train_list), paths.data_root(), cfg.image_size,
+                                         cfg.dataset, train=True)
+        else:
+            self.train_set = DepthPairs(_resolve(cfg.train_list), paths.data_root(), cfg.image_size, scale,
+                                        crop=cfg.crop, train=True)
         self.val_set = (DepthPairs(_resolve(cfg.val_list), paths.data_root(), cfg.image_size, scale)
                         if cfg.val_list else None)
         if not (self.dir / "last.ckpt").exists():   # initialisation only for a fresh run
             self._init_encoder()
         self.model.freeze_encoder()
         self.model.train()                           # decoder trains, encoder stays in eval
-        self.params = [p for p in self.model.decoder.parameters() if p.requires_grad]
+        if cfg.loss == "photometric":
+            self.criterion = PhotometricLoss(
+                smooth_weight=cfg.smooth_weight, pose_pretrained=cfg.pose_pretrained
+            ).to(self.device)
+            self.params = [p for p in list(self.model.decoder_parameters()) + list(self.criterion.parameters())
+                           if p.requires_grad]
+        else:
+            self.criterion = None
+            self.params = [p for p in self.model.decoder_parameters() if p.requires_grad]
         self.lr, self.wd = self._hp("lr", 1e-4), self._hp("weight_decay", 1e-2)
         self.epochs, self.warmup = self._hp("epochs", 25), self._hp("warmup_epochs", 1)
         self.eta_min_ratio = self._hp("eta_min_ratio", 1e-2)
@@ -263,7 +278,7 @@ class Trainer:
     # ------------------------------------------------------------------ checkpoints
     def _state(self):
         return {"model": self.model.state_dict(),
-                "criterion": self.criterion.state_dict() if self.cfg.task == "pretrain" else None,
+                "criterion": self.criterion.state_dict() if self.criterion is not None else None,
                 "opt": self.opt.state_dict(), "sched": self.sched.state_dict(), "scaler": self.scaler.state_dict(),
                 "epoch": self.epoch, "batch_in_epoch": self.batch_in_epoch, "step": self.step,
                 "sums": self.sums, "n": self.n,
@@ -277,7 +292,7 @@ class Trainer:
             raise ValueError(f"{self.last_ckpt}: config differs from the run being resumed in {diff}; "
                              "use another run name, or delete the run directory to start over")
         self.model.load_state_dict(s["model"])
-        if s["criterion"] is not None:
+        if s["criterion"] is not None and self.criterion is not None:
             self.criterion.load_state_dict(s["criterion"])
         self.opt.load_state_dict(s["opt"])
         self.sched.load_state_dict(s["sched"])
@@ -287,14 +302,29 @@ class Trainer:
         _set_rng_state(s["rng"])
         print(f"[resume] {self.last_ckpt}: epoch {self.epoch}, batch {self.batch_in_epoch}, step {self.step}")
 
+    def _encode_frozen(self, rgb: torch.Tensor):
+        if any(p.requires_grad for p in self.model.encoder.parameters()):
+            return self.model.encode(rgb)
+        with torch.no_grad():
+            return self.model.encode(rgb)
+
     # ------------------------------------------------------------------ training
     def _loss(self, batch):
         if self.cfg.task == "pretrain":
             out = lejepa_step(self.model.encode, self.criterion, batch.to(self.device, non_blocking=True))
             return out["loss"], {k: v.item() for k, v in out.items()}
+        if self.cfg.loss == "photometric":
+            b = {k: v.to(self.device, non_blocking=True) for k, v in batch.items()}
+            feats = self._encode_frozen(b["target_aug"])
+            out = self.model.decode(feats, b["target_aug"].shape[-2:])
+            pred = self._depth(out, b["target_aug"].shape[-2:]).clamp(MIN_DEPTH, self.cap)
+            res = self.criterion(
+                pred, b["prev_aug"], b["target_aug"], b["next_aug"],
+                b["prev"], b["target"], b["next"], b["K"], b["inv_K"],
+            )
+            return res["loss"], {k: v.item() for k, v in res.items()}
         rgb, gt = (t.to(self.device, non_blocking=True) for t in batch)
-        with torch.no_grad():
-            feats = self.model.encode(rgb)          # frozen encoder
+        feats = self._encode_frozen(rgb)
         out = self.model.decode(feats, rgb.shape[-2:])
         pred = self._depth(out, gt.shape[-2:]).clamp(MIN_DEPTH, self.cap)
         valid = (gt > MIN_DEPTH) & (gt < self.cap)

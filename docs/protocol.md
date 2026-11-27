@@ -27,9 +27,8 @@ so LeJEPA gains are compared **within** each model, not across models.
      one set of parameters for the whole batch).
 3. **Frozen encoder, decoder-only training**, identical procedure for the three initialisations
    (random, LeJEPA classic, LeJEPA dense), 3 seeds each (`training/trainer.py`, `task: finetune`).
-   - Open: the decoder loss, (A) photometric self-supervised or (B) ground-truth supervision.
-     (B) is implemented (scale-invariant log loss on depth, every model's output converted to depth by
-     `to_depth`); (A) waits for the decision.
+   - Chosen: (A) photometric self-supervised loss (`training/photometric.py`, `loss: photometric`);
+     (B) ground-truth `silog` is also implemented as reference.
 
 Totals: 12 pre-trainings (3 models x 2 variants x 2 datasets) and 54 decoder trainings
 (3 x 3 initialisations x 3 seeds x 2 datasets), plus FlexDepth on NYU and the public-weight evaluation.
