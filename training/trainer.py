@@ -6,6 +6,9 @@
   run, or ``public``), **frozen in eval mode**, and only the decoder is trained with the same
   procedure for every arm. For ``random`` the BatchNorm statistics are first re-estimated on
   the unlabelled frames of ``bn_list`` (without it, on the RGB column of ``train_list``).
+  Step-3 loss (decided 28/11): the original loss of each model, i.e. ``photometric`` for FlexDepth
+  and BoRe-Depth (self-supervised, frame triplets) and ``zipdepth`` for ZipDepth (``ZipDepthLoss``
+  on Depth Anything V2 pseudo-depth, as in its original training); ``silog`` (ground truth) is a reference.
 
 Common to both: seeding, automatic precision (fp32 on Pascal, fp16 autocast otherwise, never
 bf16), AdamW, per-epoch linear warm-up + cosine schedule (as in phase 1), gradient clipping,
@@ -33,10 +36,11 @@ import torch.nn.functional as F
 import yaml
 from torch.utils.data import DataLoader, Dataset, Sampler
 
-from data.datasets import DepthPairs, ImageList, TripletList, check_list
+from data.datasets import DepthPairs, ImageList, PseudoDepthList, TripletList, check_list
 from evaluation.metrics import CAPS, METRICS, MIN_DEPTH, depth_metrics, mean_metrics
 from models.baselines import build_model
 from models.public_weights import load_public_weights
+from sota.loader import load_zipdepth_loss
 from training.lejepa import LeJEPALoss, lejepa_step, load_recipe
 from training.losses import silog_loss
 from training.photometric import PhotometricLoss
@@ -65,9 +69,10 @@ class RunConfig:
     # finetune
     init: str = "random"                   # random | lejepa | public
     encoder_ckpt: str | None = None        # lejepa: path to encoder.pt of a pre-training run
-    loss: str = "silog"                    # silog (ground truth, option B) | photometric (self-supervised, option A)
+    loss: str = "silog"                    # photometric (FlexDepth, BoRe) | zipdepth (ZipDepth) | silog (ground truth, reference)
     smooth_weight: float = 1e-3            # photometric: edge-aware smoothness weight
     pose_pretrained: bool = True           # photometric: ImageNet ResNet-18 init for PoseNet
+    pseudo_teacher: str = "dav2_vitl"      # zipdepth: folder of <data root>/pseudo_depth/ (scripts/make_pseudo_depth.py)
     bn_recal_batches: int = 200
     bn_list: str | None = None             # random init: list of unlabelled frames for BatchNorm (default: train_list)
     # optimisation (pretrain: recipe values unless set here)
@@ -221,8 +226,12 @@ class Trainer:
 
     def _setup_finetune(self):
         cfg = self.cfg
-        if cfg.loss not in ("silog", "photometric"):
+        if cfg.loss not in ("silog", "photometric", "zipdepth"):
             raise ValueError(f"unknown loss {cfg.loss!r}")
+        if cfg.loss == "zipdepth" and self.model.output_kind != "relu_inverse_depth":
+            raise ValueError(f"loss 'zipdepth' is ZipDepth's own loss (affine-invariant inverse depth), not for {cfg.model!r}")
+        if cfg.model == "zipdepth" and cfg.loss == "photometric":
+            print("[loss] warning: the protocol trains ZipDepth with its own loss (loss: zipdepth), not photometric")
         scale = DEPTH_SCALE[cfg.dataset]
         check_list(_resolve(cfg.train_list), cfg.dataset, "train")
         if cfg.val_list:
@@ -230,11 +239,16 @@ class Trainer:
         if cfg.loss == "photometric":
             self.train_set = TripletList(_resolve(cfg.train_list), paths.data_root(), cfg.image_size,
                                          cfg.dataset, train=True)
+        elif cfg.loss == "zipdepth":
+            self.train_set = PseudoDepthList(_resolve(cfg.train_list), paths.data_root(), cfg.image_size,
+                                             cfg.dataset, teacher=cfg.pseudo_teacher, train=True)
         else:
             self.train_set = DepthPairs(_resolve(cfg.train_list), paths.data_root(), cfg.image_size, scale,
                                         crop=cfg.crop, train=True)
         self.val_set = (DepthPairs(_resolve(cfg.val_list), paths.data_root(), cfg.image_size, scale)
                         if cfg.val_list else None)
+        # an affine-invariant output (ZipDepth loss) has no metric scale: validate after scale-and-shift
+        self.val_alignment = "scale_shift" if cfg.loss == "zipdepth" else "median"
         if not (self.dir / "last.ckpt").exists():   # initialisation only for a fresh run
             self._init_encoder()
         self.model.freeze_encoder()
@@ -245,6 +259,9 @@ class Trainer:
             ).to(self.device)
             self.params = [p for p in list(self.model.decoder_parameters()) + list(self.criterion.parameters())
                            if p.requires_grad]
+        elif cfg.loss == "zipdepth":
+            self.criterion = load_zipdepth_loss()      # alpha_ssi 1, alpha_grad 2, 4 gradient scales (its trainer)
+            self.params = [p for p in self.model.decoder_parameters() if p.requires_grad]
         else:
             self.criterion = None
             self.params = [p for p in self.model.decoder_parameters() if p.requires_grad]
@@ -323,6 +340,13 @@ class Trainer:
                 b["prev"], b["target"], b["next"], b["K"], b["inv_K"],
             )
             return res["loss"], {k: v.item() for k, v in res.items()}
+        if self.cfg.loss == "zipdepth":
+            rgb, target = (t.to(self.device, non_blocking=True) for t in batch)
+            out = self.model.decode(self._encode_frozen(rgb), rgb.shape[-2:])
+            pred = F.interpolate(out.float(), size=target.shape[-2:], mode="bilinear", align_corners=False)
+            with torch.autocast(device_type=self.device.type, enabled=False):   # median/MAD in fp32
+                loss, parts = self.criterion(pred.float(), target.float())
+            return loss, {"loss": loss.item(), **parts}
         rgb, gt = (t.to(self.device, non_blocking=True) for t in batch)
         feats = self._encode_frozen(rgb)
         out = self.model.decode(feats, rgb.shape[-2:])
@@ -379,7 +403,8 @@ class Trainer:
                    "seconds": round(time.time() - t0, 1), **{f"train_{k}": v / max(self.n, 1) for k, v in self.sums.items()}}
             if self.val_set is not None:       # same columns every epoch: empty when the epoch is not validated
                 run_val = (self.epoch + 1) % cfg.val_every == 0 or self.epoch + 1 == self.epochs
-                val = self.evaluate(self.val_set, ("median",))["median"] if run_val else dict.fromkeys(METRICS, "")
+                val = (self.evaluate(self.val_set, (self.val_alignment,))[self.val_alignment] if run_val
+                       else dict.fromkeys(METRICS, ""))
                 row.update({f"val_{k}": v for k, v in val.items()})
             self.sched.step()
             self.epoch, self.batch_in_epoch = self.epoch + 1, 0

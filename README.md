@@ -49,7 +49,7 @@ On the ALCOR machines everything runs in Podman: see [`docs/alcor.md`](docs/alco
 |---|---|
 | Repository restructure, common model interface, protocol metrics, container and lab scripts | done |
 | LeJEPA classic / dense in one code path; phase-1 recipes reproduce the exam code exactly (`scripts/verify_phase1_equivalence.py`) | done |
-| One trainer for pre-training and frozen-encoder fine-tuning, with checkpoint + resume | done (step-3 loss: ground truth; photometric pending the decision) |
+| One trainer for pre-training and frozen-encoder fine-tuning, with checkpoint + resume | done (step-3 loss: photometric for FlexDepth/BoRe, ZipDepthLoss on Depth Anything V2 pseudo-depth for ZipDepth) |
 | NYU complete download and labelled-frame extraction (`data/download/nyu.py`) | done, to run on the lab |
 | FlexDepth on NYU, original trainer (`scripts/train_flexdepth_nyu.py`, lists from `data.download.nyu triplets`) | script + CPU test done; GPU run on the lab pending |
 | Public-weight loaders (step 1), KITTI preparation, NYU raw depth alignment | next |

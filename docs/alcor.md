@@ -40,6 +40,17 @@ podman logs -f <job-name>        # or: tail -f /mnt/hdd2/$USER/runs/<job-name>/s
 seen as `cuda:0` inside), uses `--ipc host` and `--cpus=6`, and mounts the four folders above.
 Jobs run detached, so closing the SSH session does not stop them (tmux is still handy for watching).
 
+## ZipDepth pseudo-depth (before its step-3 runs)
+`loss: zipdepth` needs the Depth Anything V2 Large targets of the training frames, written once per dataset
+to `data/pseudo_depth/dav2_vitl/` (fp32, resumable: re-run the same command after an interruption).
+```bash
+# time it first on 200 frames, then launch the full list (GPU booked for today)
+scripts/alcor/run.sh 2 dav2_nyu_time python3 scripts/make_pseudo_depth.py --dataset nyu --list splits/nyu_raw_triplets_train.txt --limit 200
+scripts/alcor/run.sh 2 dav2_nyu python3 scripts/make_pseudo_depth.py --dataset nyu --list splits/nyu_raw_triplets_train.txt
+```
+The weights (1.34 GB) are downloaded on first use to `cache/dav2/depth_anything_v2_vitl.pth`. If Hugging Face
+is not reachable from the lab, download them elsewhere and copy them there with `scp`.
+
 ## After a campaign
 ```bash
 scripts/alcor/cleanup.sh          # stop/remove our containers, drop dangling layers

@@ -9,8 +9,12 @@ modules are moved out of the global module table, so that:
 
 Only the architectures are used: method-specific training heuristics are not imported.
 
+Exception: ZipDepth's own loss (``ZipDepthLoss``) is imported for step 3, together with its
+teacher, Depth Anything V2, used offline to generate the pseudo-depth targets
+(``scripts/make_pseudo_depth.py``).
+
 Pinned commits (see ``.gitmodules`` and ``docs/references.md``):
-FlexDepth b04ae3a, ZipDepth 91f3fd2, BoRe-Depth db801e2.
+FlexDepth b04ae3a, ZipDepth 91f3fd2, BoRe-Depth db801e2, Depth Anything V2 a561b84.
 """
 from __future__ import annotations
 
@@ -27,6 +31,14 @@ REPOS = {
     "flexdepth": SOTA_DIR / "flexdepth",
     "zipdepth": SOTA_DIR / "zipdepth",
     "bore": SOTA_DIR / "bore_depth",
+    "depth_anything_v2": SOTA_DIR / "depth_anything_v2",
+}
+
+# Depth Anything V2 configurations, as in its run.py
+DAV2_CONFIGS = {
+    "vits": {"encoder": "vits", "features": 64, "out_channels": [48, 96, 192, 384]},
+    "vitb": {"encoder": "vitb", "features": 128, "out_channels": [96, 192, 384, 768]},
+    "vitl": {"encoder": "vitl", "features": 256, "out_channels": [256, 512, 1024, 1024]},
 }
 
 
@@ -125,4 +137,24 @@ def load_bore():
         from model.DepthNet import DepthNet
 
         model = DepthNet()
+    return model
+
+
+def load_zipdepth_loss(**kwargs) -> nn.Module:
+    """ZipDepth's own step-3 loss: SSI (median/MAD) + multi-scale gradient matching, defaults as in its trainer."""
+    with isolated_import("zipdepth"):
+        from zipdepth.loss.depth_loss import ZipDepthLoss
+
+        loss = ZipDepthLoss(**kwargs)
+    return loss
+
+
+def load_depth_anything_v2(encoder: str = "vitl") -> nn.Module:
+    """Depth Anything V2 (randomly initialised; load the released weights with ``load_state_dict``)."""
+    if encoder not in DAV2_CONFIGS:
+        raise ValueError(f"unknown Depth Anything V2 encoder {encoder!r}: {sorted(DAV2_CONFIGS)}")
+    with isolated_import("depth_anything_v2"):
+        from depth_anything_v2.dpt import DepthAnythingV2
+
+        model = DepthAnythingV2(**DAV2_CONFIGS[encoder])
     return model
