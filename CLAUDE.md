@@ -41,10 +41,13 @@ experimental protocol in `docs/protocol.md`, checklist in `docs/experimental_pla
 - Split lists live in the data root (`<LG_DATA_ROOT>/splits/`, `/work/data/splits/` in the container), not in the repo;
   `--list splits/...` is resolved against the data root.
 - FlexDepth-Nano retrained on NYU with `train_flexdepth_nyu.py` on the lab (50 epochs, `weights/flexdepth_n_nyu/`).
-- Step 2 (reference weights, CPU, 28/11): FlexDepth NYU, BoRe-Depth NYU / KITTI, ZipDepth NYU / KITTI evaluated, JSON +
-  `summary.csv` in `results/step2_public/` (protocol, weight SHA-256 and README comparison in its README). BoRe NYU
-  matches its README; KITTI numbers are on the 652 improved-GT split, not comparable with raw-LiDAR tables.
-  Released BoRe checkpoints are on the lab in `cache/public_weights/bore/` (not in git).
+- Step 2 (reference weights, CPU, 28/11): all six runs done (FlexDepth NYU / KITTI, BoRe-Depth NYU / KITTI,
+  ZipDepth NYU / KITTI), JSON + `summary.csv` in `results/step2_public/` (protocol, weight SHA-256 and README
+  comparison in its README). BoRe NYU matches its README; KITTI numbers are on the 652 improved-GT split, not
+  comparable with the raw-LiDAR Eigen tables of BoRe and FlexDepth. Released checkpoints are on the lab in
+  `cache/public_weights/{bore,flexdepth_n_kitti}/` (not in git). The released FlexDepth checkpoints carry `thop`
+  `total_ops`/`total_params` buffers, dropped by the loader since PR #9; their `encoder.pth` stores only
+  height/width/use_stereo (192×640 for KITTI).
 - Depth Anything V2 Large on the lab (1080 Ti, fp32): released weights load strictly; NYU 2.0 frames/s, 2.8 GB peak,
   ~53 MB of PNG per 200 frames. NYU full run (24,863 triplets) launched 28/11; KITTI not measured yet.
 - KITTI: layout on ALCOR verified (151 drives, 47,889 frames, annotated GT on the same drives); `--make_splits` run on
@@ -56,6 +59,6 @@ experimental protocol in `docs/protocol.md`, checklist in `docs/experimental_pla
 ## Open items
 - Step-3 loss: `photometric` (FlexDepth, BoRe) and `zipdepth` (ZipDepth) implemented; ZipDepth `cross_scale.low_to_high`
   is trained with the decoder in both. Not yet run as a training job on GPU.
-- Step 2: FlexDepth-Nano KITTI still to evaluate (released weights from HuggingFace `StarNew/flexdepth`); FlexDepth NYU
-  has no published reference, compare with Luca's step-1 evaluation.
+- Step 2: FlexDepth NYU has no published reference, compare with Luca's step-1 evaluation. ZipDepth "278/278 tensors"
+  count in `docs/experimental_plan.md` not checked yet (strict load passes).
 - `make_views` takes ~65% of a training step on CPU; not measured on GPU yet.
