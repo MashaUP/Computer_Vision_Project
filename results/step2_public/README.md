@@ -49,7 +49,8 @@ Loading (`models/public_weights.py`, strict, `weights_only=True`):
   `hyper_parameters`. Of their 1,083 tensors, the 953 of `depth_net` are loaded strictly and the 130 of `pose_net`
   (training only) are dropped. The runs used the loader from before PR #7, which still had the unsafe fallback, but
   `weights_only=True` succeeded on the first try, so PR #7 does not change these numbers.
-- **ZipDepth-Base:** loaded strictly with `weights_only=True`; only the `mean`/`std` normalisation buffers are ignored.
+- **ZipDepth-Base:** loaded strictly with `weights_only=True`: the checkpoint holds 278 tensors, the 276 model weights
+  (all equal to the checkpoint after loading) and the `mean`/`std` normalisation buffers, which are the only ones ignored.
 - **FlexDepth-Nano KITTI:** both files load with `weights_only=True`. `encoder.pth` stores only `height` 192,
   `width` 640 and `use_stereo` False, with no `decoder_model_type` or decoder flags. The released files also carry
   the scalar `*.total_ops` / `*.total_params` buffers of the `thop` profiler (72 in the encoder, 32 in the decoder,

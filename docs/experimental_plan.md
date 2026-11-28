@@ -30,8 +30,8 @@ Tick a box in the same commit that completes the item. Protocol details: [`proto
 - [x] **FlexDepth-Nano** (1.52 M)
   - [x] Evaluate on KITTI (652) with the released weights (HuggingFace `StarNew/flexdepth`, 192×640; `results/step2_public/`)
   - [x] Evaluate on NYU (654) with the step-1 checkpoint
-- [ ] **ZipDepth-Base** (6.79 M)
-  - [ ] Load the released zero-shot weights (check 278/278 tensors)
+- [x] **ZipDepth-Base** (6.79 M)
+  - [x] Load the released zero-shot weights (check 278/278 tensors): 278 tensors in `zipdepth_base.pth` = 276 model weights, all loaded strictly and equal after loading, + the `mean` / `std` normalisation buffers
   - [x] Evaluate on NYU (654) and KITTI (652) at their own resolutions (384×512, 384×1280; `results/step2_public/`)
 - [x] **BoRe-Depth** (8.66 M)
   - [x] Download the NYU and KITTI weights from Drive and load them with *strict key checking* (`weights_only=True`, SHA-256 in `results/step2_public/README.md`)
