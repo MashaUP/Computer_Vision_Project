@@ -199,3 +199,29 @@ def test_trainer_finetune_init_public_keeps_encoder_frozen(synthetic_nyu, tmp_pa
     after = torch.load(runs / "ft_public/model.pt", weights_only=True)
     for k, v in src.encoder.state_dict().items():
         assert torch.equal(after[f"encoder.{k}"], v), k
+
+
+class _PickleSideEffect:
+    """Unpickling this object creates ``marker``: it stands for arbitrary code in an untrusted checkpoint."""
+
+    def __init__(self, marker):
+        self.marker = str(marker)
+
+    def __reduce__(self):
+        return (open, (self.marker, "w"))
+
+
+def test_torch_load_never_unpickles_arbitrary_objects(tmp_path):
+    from models.public_weights import _torch_load
+
+    marker = tmp_path / "side_effect"
+    bad = tmp_path / "bad.ckpt"
+    torch.save({"state_dict": {"w": torch.zeros(1)}, "hyper_parameters": _PickleSideEffect(marker)}, bad)
+    with pytest.raises(RuntimeError, match="weights_only=True"):
+        _torch_load(bad)
+    assert not marker.exists()
+
+    # a plain Lightning-style checkpoint (tensors + simple metadata) still loads
+    ok = tmp_path / "ok.ckpt"
+    torch.save({"state_dict": {"w": torch.ones(2)}, "pytorch-lightning_version": "2.0.0"}, ok)
+    assert torch.equal(_torch_load(ok)["state_dict"]["w"], torch.ones(2))

@@ -40,13 +40,20 @@ def _strip_prefixes(key: str, prefixes: tuple[str, ...]) -> str:
     return key
 
 
-def _torch_load(path: Path, *, allow_unsafe_fallback: bool = False):
+def _torch_load(path: Path):
+    """Load a checkpoint with ``weights_only=True`` only: never unpickle arbitrary objects.
+
+    External checkpoints come from third-party downloads, and ``weights_only=False`` would execute
+    whatever the pickle contains. If a checkpoint holds non-tensor objects that the safe loader
+    rejects, extract its state dict once in a trusted environment instead of loosening this call.
+    """
     try:
         return torch.load(path, map_location="cpu", weights_only=True)
-    except (pickle.UnpicklingError, RuntimeError):
-        if not allow_unsafe_fallback:
-            raise
-        return torch.load(path, map_location="cpu", weights_only=False)
+    except (pickle.UnpicklingError, RuntimeError) as e:
+        raise RuntimeError(
+            f"{path} cannot be loaded with weights_only=True (it contains non-tensor objects). "
+            "Unsafe unpickling is disabled on purpose: re-save its state dict from a trusted copy."
+        ) from e
 
 
 def _load_flexdepth(model: DepthBaseline, source: Path, *, encoder_only: bool) -> dict:
@@ -110,7 +117,7 @@ def _load_zipdepth(model: DepthBaseline, source: Path, *, encoder_only: bool) ->
 def _load_bore(model: DepthBaseline, source: Path, *, encoder_only: bool) -> dict:
     if not source.is_file():
         raise FileNotFoundError(f"missing BoRe-Depth checkpoint: {source}")
-    ckpt = _torch_load(source, allow_unsafe_fallback=True)
+    ckpt = _torch_load(source)
     sd = ckpt["state_dict"] if isinstance(ckpt, dict) and "state_dict" in ckpt else ckpt
 
     enc_sd, dec_sd, unexpected = {}, {}, []
