@@ -27,8 +27,14 @@ so LeJEPA gains are compared **within** each model, not across models.
      one set of parameters for the whole batch).
 3. **Frozen encoder, decoder-only training**, identical procedure for the three initialisations
    (random, LeJEPA classic, LeJEPA dense), 3 seeds each (`training/trainer.py`, `task: finetune`).
-   - Chosen: (A) photometric self-supervised loss (`training/photometric.py`, `loss: photometric`);
-     (B) ground-truth `silog` is also implemented as reference.
+   - Loss (decided 28/11): the original loss of each model. FlexDepth and BoRe-Depth: photometric
+     self-supervised loss on frame triplets (`training/photometric.py`, `loss: photometric`). ZipDepth:
+     its own `ZipDepthLoss` (SSI after median/MAD normalisation + 4-scale gradient matching, weights 1 / 2)
+     on Depth Anything V2 Large pseudo-depth, as in its original distillation (`loss: zipdepth`;
+     targets from `scripts/make_pseudo_depth.py`, on the middle frames of the same triplet lists).
+     Ground-truth `silog` is implemented as a reference only.
+   - ZipDepth's output is affine-invariant inverse depth: its validation uses scale-and-shift, and its
+     test numbers are read after scale-and-shift (median scaling is reported but not meaningful).
 
 Totals: 12 pre-trainings (3 models x 2 variants x 2 datasets) and 54 decoder trainings
 (3 x 3 initialisations x 3 seeds x 2 datasets), plus FlexDepth on NYU and the public-weight evaluation.

@@ -14,6 +14,11 @@
 | FlexDepth | <https://github.com/startnew/flexdepth> | `b04ae3a` |
 | ZipDepth | <https://github.com/fabiotosi92/ZipDepth> | `91f3fd2` |
 | BoRe-Depth | <https://github.com/liangxiansheng093/BoRe-Depth> | `db801e2` |
+| Depth Anything V2 (ZipDepth's teacher, pseudo-depth only) | <https://github.com/DepthAnything/Depth-Anything-V2> | `a561b84` |
+
+Depth Anything V2 Large weights: <https://huggingface.co/depth-anything/Depth-Anything-V2-Large>
+(`depth_anything_v2_vitl.pth`, 1.34 GB, CC-BY-NC-4.0), downloaded by `scripts/make_pseudo_depth.py`
+to `<cache root>/dav2/`.
 
 ## Data
 - NYU Depth V2: <https://cs.nyu.edu/~fergus/datasets/nyu_depth_v2.html>

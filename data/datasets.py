@@ -5,9 +5,15 @@ the data root:
 
 * unlabelled frames (LeJEPA pre-training, BatchNorm re-estimation): ``rgb_path``
 * labelled pairs (fine-tuning, validation, test): ``rgb_path depth_path``
+* frame triplets (photometric and ZipDepth fine-tuning): ``prev_path target_path next_path``
 
 Depth maps are 16-bit PNGs; ``depth_scale`` converts them to metres (NYU from our extraction: 1000,
 i.e. millimetres; KITTI: 256). A value of 0 means no measurement.
+
+Pseudo-depth targets (``loss: zipdepth``) are written by ``scripts/make_pseudo_depth.py`` under
+``<data root>/pseudo_depth/<teacher>/`` with the relative path of their frame (``.png``): 16-bit
+relative inverse depth, divided by its per-image maximum. ``ZipDepthLoss`` normalises every target
+by its median and mean absolute deviation, so this per-image scale does not change the loss.
 """
 from __future__ import annotations
 
@@ -172,6 +178,85 @@ NORM_INTRINSICS = {
 }
 
 
+def frame_path(root: Path, rel: str, dataset: str) -> Path:
+    """File to read for a list entry: on NYU, the rectified PNG of a raw frame when it exists
+    (``nyu/rect/...``, written by ``scripts/train_flexdepth_nyu.py --make-png``), else the file itself."""
+    root = Path(root)
+    if dataset == "nyu":
+        p = Path(rel)
+        if len(p.parts) >= 2 and p.parts[0] == "nyu" and p.parts[1] == "raw":
+            png = (root / "nyu" / "rect" / p.relative_to("nyu/raw")).with_suffix(".png")
+            if png.exists():
+                return png
+    return root / rel
+
+
+def target_frame(tokens: list[str]) -> str:
+    """The frame a list line supervises: the middle one of a triplet, else the first column."""
+    return tokens[1] if len(tokens) >= 3 else tokens[0]
+
+
+def pseudo_depth_path(root: Path, teacher: str, rel: str) -> Path:
+    """Where ``scripts/make_pseudo_depth.py`` writes the pseudo-depth of frame ``rel``."""
+    return (Path(root) / "pseudo_depth" / teacher / rel).with_suffix(".png")
+
+
+def load_pseudo_depth(path: Path) -> torch.Tensor:
+    """(1, H, W) relative inverse depth in [0, 1] (per-image scale, see the module docstring)."""
+    return torch.from_numpy(np.asarray(Image.open(path), dtype=np.float32) / 65535.0)[None]
+
+
+def _color_jitter(jitter: ColorJitter, frames: torch.Tensor) -> torch.Tensor:
+    """The same random colour jitter on a stack of frames (N, 3, H, W)."""
+    from torchvision.transforms import functional as TF
+
+    fn_idx, b, c, s, hue = ColorJitter.get_params(jitter.brightness, jitter.contrast, jitter.saturation, jitter.hue)
+    for fn_id in fn_idx:
+        if fn_id == 0 and b is not None:
+            frames = TF.adjust_brightness(frames, b)
+        elif fn_id == 1 and c is not None:
+            frames = TF.adjust_contrast(frames, c)
+        elif fn_id == 2 and s is not None:
+            frames = TF.adjust_saturation(frames, s)
+        elif fn_id == 3 and hue is not None:
+            frames = TF.adjust_hue(frames, hue)
+    return frames
+
+
+class PseudoDepthList(Dataset):
+    """Frames with their teacher pseudo-depth, for ZipDepth's own loss (``loss: zipdepth``).
+
+    Reads the same list files as ``TripletList`` (the target frame of each triplet) or frame lists.
+    RGB and pseudo-depth are resized to ``size``; ``train`` enables the same augmentation as
+    ``TripletList``: horizontal flip (p = 0.5) and colour jitter on the input only (p = 0.5).
+    Returns ``(rgb, pseudo_depth)``.
+    """
+
+    def __init__(self, list_file, root, size, dataset: str, teacher: str = "dav2_vitl", train: bool = True):
+        self.items = read_list(list_file)
+        self.root, self.size, self.dataset, self.teacher, self.train = Path(root), tuple(size), dataset, teacher, train
+        self._jitter = ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1)
+        missing = [t for t in (target_frame(it) for it in self.items)
+                   if not pseudo_depth_path(self.root, teacher, t).exists()]
+        if missing:
+            raise FileNotFoundError(
+                f"{len(missing)}/{len(self.items)} frames of {list_file} have no {teacher} pseudo-depth "
+                f"(first: {pseudo_depth_path(self.root, teacher, missing[0])}); run scripts/make_pseudo_depth.py")
+
+    def __len__(self):
+        return len(self.items)
+
+    def __getitem__(self, i):
+        rel = target_frame(self.items[i])
+        rgb = resize(load_rgb(frame_path(self.root, rel, self.dataset)), self.size)
+        target = resize(load_pseudo_depth(pseudo_depth_path(self.root, self.teacher, rel)), self.size)
+        if self.train and random.random() < 0.5:
+            rgb, target = rgb.flip(-1), target.flip(-1)
+        if self.train and random.random() < 0.5:
+            rgb = _color_jitter(self._jitter, rgb[None])[0]
+        return rgb, target
+
+
 class TripletList(Dataset):
     """(prev, target, next) RGB triplets for self-supervised photometric fine-tuning."""
 
@@ -186,13 +271,7 @@ class TripletList(Dataset):
         return len(self.items)
 
     def _load_frame(self, rel: str) -> torch.Tensor:
-        if self.dataset == "nyu":
-            p = Path(rel)
-            if len(p.parts) >= 2 and p.parts[0] == "nyu" and p.parts[1] == "raw":
-                png = (self.root / "nyu" / "rect" / p.relative_to("nyu/raw")).with_suffix(".png")
-                if png.exists():
-                    return resize(load_rgb(png), self.size)
-        return resize(load_rgb(self.root / rel), self.size)
+        return resize(load_rgb(frame_path(self.root, rel, self.dataset)), self.size)
 
     def __getitem__(self, i):
         prev_rel, target_rel, next_rel = self.items[i][:3]
@@ -215,20 +294,7 @@ class TripletList(Dataset):
             K[0, 2] = w - K[0, 2]
 
         if self.train and random.random() < 0.5:
-            fn_idx, b, c, s, hue = ColorJitter.get_params(
-                self._jitter.brightness, self._jitter.contrast, self._jitter.saturation, self._jitter.hue
-            )
-            stacked = torch.stack([prev, target, nxt], dim=0)
-            from torchvision.transforms import functional as TF
-            for fn_id in fn_idx:
-                if fn_id == 0 and b is not None:
-                    stacked = TF.adjust_brightness(stacked, b)
-                elif fn_id == 1 and c is not None:
-                    stacked = TF.adjust_contrast(stacked, c)
-                elif fn_id == 2 and s is not None:
-                    stacked = TF.adjust_saturation(stacked, s)
-                elif fn_id == 3 and hue is not None:
-                    stacked = TF.adjust_hue(stacked, hue)
+            stacked = _color_jitter(self._jitter, torch.stack([prev, target, nxt], dim=0))
             prev_aug, target_aug, next_aug = stacked[0], stacked[1], stacked[2]
         else:
             prev_aug, target_aug, next_aug = prev, target, nxt

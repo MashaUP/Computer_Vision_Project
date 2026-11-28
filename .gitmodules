@@ -7,3 +7,6 @@
 [submodule "sota/bore_depth"]
 	path = sota/bore_depth
 	url = https://github.com/liangxiansheng093/BoRe-Depth
+[submodule "sota/depth_anything_v2"]
+	path = sota/depth_anything_v2
+	url = https://github.com/DepthAnything/Depth-Anything-V2
