@@ -32,10 +32,10 @@ Tick a box in the same commit that completes the item. Protocol details: [`proto
   - [x] Evaluate on NYU (654) with the step-1 checkpoint
 - [ ] **ZipDepth-Base** (6.79 M)
   - [ ] Load the released zero-shot weights (check 278/278 tensors)
-  - [ ] Evaluate on NYU (654) and KITTI (652) at their own resolutions
-- [ ] **BoRe-Depth** (8.66 M)
-  - [ ] Download the NYU and KITTI weights from Drive and load them with *strict key checking*
-  - [ ] Evaluate on NYU (654) and KITTI (652)
+  - [x] Evaluate on NYU (654) and KITTI (652) at their own resolutions (384×512, 384×1280; `results/step2_public/`)
+- [x] **BoRe-Depth** (8.66 M)
+  - [x] Download the NYU and KITTI weights from Drive and load them with *strict key checking* (`weights_only=True`, SHA-256 in `results/step2_public/README.md`)
+  - [x] Evaluate on NYU (654) and KITTI (652) (256×320, 256×832; `results/step2_public/`)
 - [ ] Save all step-2 numbers (FlexDepth NYU included) in `results/` as JSON / CSV
 
 ## 3. LeJEPA SSL pre-training and decoder fine-tuning (3 seeds)
