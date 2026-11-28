@@ -2,7 +2,9 @@
 
 Supported formats:
 * ``flexdepth``: directory containing ``encoder.pth`` and ``depth.pth`` (or ``encoder.pth`` alone when
-  ``encoder_only=True``). Metadata keys written by FlexDepth's ``save_model`` are extracted and returned.
+  ``encoder_only=True``). Metadata keys written by FlexDepth's ``save_model`` are extracted and returned;
+  scalar ``*.total_ops`` / ``*.total_params`` buffers left by the ``thop`` FLOPs profiler (present in the
+  released KITTI weights) are dropped.
 * ``zipdepth``: checkpoint file (``model_state_dict`` or raw state dict), stripping ``module.`` /
   ``_orig_mod.`` prefixes and ignoring only the ``mean`` / ``std`` normalisation buffers.
 * ``bore``: PyTorch Lightning ``.ckpt`` (``state_dict``) or raw state dict, stripping ``module.`` and
@@ -56,6 +58,22 @@ def _torch_load(path: Path):
         ) from e
 
 
+PROFILER_BUFFER_SUFFIXES = (".total_ops", ".total_params")
+
+
+def _drop_profiler_buffers(sd: dict) -> dict:
+    """Remove the scalar ``total_ops`` / ``total_params`` buffers that ``thop.profile`` registers on every module.
+
+    They are bookkeeping, not weights (the released FlexDepth KITTI checkpoints carry them, all zero), and the
+    official evaluation drops them with a non-strict load. Only scalar tensors with these exact suffixes are
+    removed, so any other mismatch still fails the strict load.
+    """
+    return {
+        k: v for k, v in sd.items()
+        if not (k.endswith(PROFILER_BUFFER_SUFFIXES) and torch.is_tensor(v) and v.numel() == 1)
+    }
+
+
 def _load_flexdepth(model: DepthBaseline, source: Path, *, encoder_only: bool) -> dict:
     if source.is_dir():
         enc_path = source / "encoder.pth"
@@ -69,7 +87,7 @@ def _load_flexdepth(model: DepthBaseline, source: Path, *, encoder_only: bool) -
     if not enc_path.is_file():
         raise FileNotFoundError(f"missing FlexDepth encoder weights: {enc_path}")
 
-    raw_enc = dict(_torch_load(enc_path))
+    raw_enc = _drop_profiler_buffers(dict(_torch_load(enc_path)))
     meta = {k: raw_enc.pop(k) for k in list(raw_enc) if k in FLEXDEPTH_META_KEYS}
     expected_dec_type = f"flex{getattr(model, 'scale', 'n')}"
     if "decoder_model_type" in meta and meta["decoder_model_type"] != expected_dec_type:
@@ -81,7 +99,7 @@ def _load_flexdepth(model: DepthBaseline, source: Path, *, encoder_only: bool) -
     if not encoder_only:
         if dec_path is None or not dec_path.is_file():
             raise FileNotFoundError(f"missing FlexDepth decoder weights: {dec_path}")
-        raw_dec = _torch_load(dec_path)
+        raw_dec = _drop_profiler_buffers(dict(_torch_load(dec_path)))
         model.decoder.load_state_dict(raw_dec, strict=True)
 
     return meta
