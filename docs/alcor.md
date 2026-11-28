@@ -60,8 +60,14 @@ KITTI frames are wider (375 x 1242): time it with `--limit 200` before the full 
 ```bash
 scripts/alcor/run.sh cpu kitti_splits python3 -m data.download.download_kitti --make_splits
 ```
-Writes the seven `kitti_*` lists to `data/splits/` (it overwrites existing ones). Run on 28/11: 109 train /
+Writes the seven `kitti_*` lists to `/mnt/hdd2/<user>/data/splits/` (it overwrites existing ones). Run on 28/11: 109 train /
 14 val / 28 Eigen test drives, 27,154 train triplets, 652 test pairs.
+
+## Reference weights and CPU evaluation (step 2)
+Released weights stay outside the repository, in `cache/public_weights/` (see `weights/README.md`); download
+large files elsewhere and copy them with `scp` when the lab cannot reach the source (Google Drive). Test-set
+evaluation of a reference model fits on CPU (2-11 min per model and dataset), so it needs no booking:
+the exact commands of step 2 are in `results/step2_public/README.md`.
 
 ## After a campaign
 ```bash

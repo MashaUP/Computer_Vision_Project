@@ -53,8 +53,24 @@ experimental protocol in `docs/protocol.md`, checklist in `docs/experimental_pla
 - KITTI: layout on ALCOR verified (151 drives, 47,889 frames, annotated GT on the same drives); `--make_splits` run on
   28/11: 109 train / 14 val / 28 Eigen test drives, 27,154 train triplets, 652 test pairs; no test or val drive in any
   path of the train lists.
-- NYU: 24,863 train triplets. `data/splits/` also holds `.bak` copies from 26/11 with 6 more lines, probably the lists
+- NYU: 24,863 train triplets. `<data root>/splits/` also holds `.bak` copies from 26/11 with 6 more lines, probably the lists
   from before the `ppm_ok` fix (c68b153, truncated raw frames skipped): to confirm, then remove.
+
+## Lab right now (28/11, 14:30)
+- GPU 2 (1080 Ti) is booked by Andrea for 28/11 and 29/11: job `dav2_nyu` (NYU pseudo-depth, ends ~15:40), then
+  `dav2_kitti_time` (`--limit 200`) and `dav2_kitti` (full KITTI, overnight, ~11-15 h estimated). Do not start
+  other jobs on GPU 2; check with `podman ps` and `tail -1 /mnt/hdd2/masciarelli/runs/<job>/stdout.log`.
+- GPU 1 reports `ERR!` on fan / power and 100% utilisation with no process: avoid it (to report to the GPU admins).
+- GPU 0 (1080, 8 GB) is free. Test-set evaluations and list generation run on CPU (`run.sh cpu ...`), no booking.
+- On the lab the repository is only updated with `git pull` (no edits there); outputs go to
+  `runs/` and `cache/`, and results reach `results/` through a PR.
+
+## Next steps
+1. KITTI pseudo-depth on GPU 2 (timing, then full run); tick section 3.0 of `docs/experimental_plan.md`.
+2. Compare our FlexDepth NYU step-2 numbers (`results/step2_public/flexdepth_nyu.json`) with Luca's evaluation.
+3. LeJEPA pilot (memory, time per epoch, `make_views` on GPU) for each encoder, locally on the RTX 5070 first;
+   then the GPU-credit plan for the 12 pre-trainings and 54 decoder runs.
+4. Confirm and remove the NYU `.bak` lists.
 
 ## Open items
 - Step-3 loss: `photometric` (FlexDepth, BoRe) and `zipdepth` (ZipDepth) implemented; ZipDepth `cross_scale.low_to_high`

@@ -20,6 +20,10 @@ Depth Anything V2 Large weights: <https://huggingface.co/depth-anything/Depth-An
 (`depth_anything_v2_vitl.pth`, 1.34 GB, CC-BY-NC-4.0), downloaded by `scripts/make_pseudo_depth.py`
 to `<cache root>/dav2/`.
 
+Released baseline weights (step 2; not in git, origin and SHA-256 in `results/step2_public/README.md`):
+FlexDepth <https://huggingface.co/StarNew/flexdepth> (AGPL-3.0); ZipDepth `checkpoints/zipdepth_base.pth` in its
+repository (MIT); BoRe-Depth, Google Drive folder linked in its README (MIT).
+
 ## Data
 - NYU Depth V2: <https://cs.nyu.edu/~fergus/datasets/nyu_depth_v2.html>
 - NYU training split with frame sequences: StructDepth, <https://github.com/SJTU-ViSYS/StructDepth> (`1747827`),
