@@ -59,6 +59,5 @@ experimental protocol in `docs/protocol.md`, checklist in `docs/experimental_pla
 ## Open items
 - Step-3 loss: `photometric` (FlexDepth, BoRe) and `zipdepth` (ZipDepth) implemented; ZipDepth `cross_scale.low_to_high`
   is trained with the decoder in both. Not yet run as a training job on GPU.
-- Step 2: FlexDepth NYU has no published reference, compare with Luca's step-1 evaluation. ZipDepth "278/278 tensors"
-  count in `docs/experimental_plan.md` not checked yet (strict load passes).
+- Step 2: FlexDepth NYU has no published reference, compare with Luca's step-1 evaluation.
 - `make_views` takes ~65% of a training step on CPU; not measured on GPU yet.
