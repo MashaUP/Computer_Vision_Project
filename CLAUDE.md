@@ -2,7 +2,7 @@
 
 LeJEPA (SIGReg) self-supervised pre-training vs random init for lightweight depth encoders
 (FlexDepth, ZipDepth, BoRe-Depth, METER), on NYU Depth V2 and KITTI. Overview in `README.md`,
-experimental protocol in `docs/protocol.md`.
+experimental protocol in `docs/protocol.md`, checklist in `docs/experimental_plan.md` (tick items as they are done).
 
 ## Setup
 - Local: `.venv` with Python 3.12; `pip install torch torchvision` from PyPI, then `pip install '.[test]'`.
@@ -54,5 +54,4 @@ experimental protocol in `docs/protocol.md`.
 - Step-3 loss: `photometric` (FlexDepth, BoRe) and `zipdepth` (ZipDepth) implemented; ZipDepth `cross_scale.low_to_high`
   is trained with the decoder in both. Not yet run as a training job on GPU.
 - Public-weight evaluation still to run: FlexDepth KITTI, ZipDepth NYU / KITTI, BoRe-Depth NYU / KITTI.
-- `piano_sperimentale_lejepa.pdf` still shows option A (photometric for all) for the step-3 loss.
 - `make_views` takes ~65% of a training step on CPU; not measured on GPU yet.
