@@ -1,14 +1,25 @@
 # Reference Weights
 
-Curated inference-only checkpoints for step 1 (reference baselines), tracked in git via the `!weights/` exception in `.gitignore`.
+Curated inference-only checkpoints, tracked in git via the `!weights/` exception in `.gitignore`.
+Only **our own** small checkpoints go here; released third-party weights are not mirrored.
 
-## Naming convention
-- `weights/flexdepth_n_nyu/` — `encoder.pth` and `depth.pth` (FlexDepth-Nano retrained on NYU raw, 50 epochs; do **not** include `adam.pth`, `pose*.pth`, or `var.pth`).
-- `weights/flexdepth_n_kitti/` — `encoder.pth` and `depth.pth` (official released FlexDepth-Nano KITTI weights, if mirrored).
-- `weights/zipdepth_base.pth` — ZipDepth-Base zero-shot checkpoint.
-- `weights/bore_<dataset>.ckpt` — BoRe-Depth reference checkpoint (`nyu`, `kitti`).
+## In git
+- `weights/flexdepth_n_nyu/`: `encoder.pth` and `depth.pth` (FlexDepth-Nano retrained on NYU raw in step 1,
+  epoch 50 = `weights_49`; do **not** include `adam.pth`, `pose*.pth` or `var.pth`).
 
-Evaluate any entry with:
+## Released weights (not in git)
+They stay on the lab machine, outside the repository; origin, licence and SHA-256 of each file are in
+[`results/step2_public/README.md`](../results/step2_public/README.md).
+
+| Model | Where (lab) | `--weights` in the container |
+|---|---|---|
+| FlexDepth-Nano KITTI (HuggingFace `StarNew/flexdepth`, `kitti/flex_n`) | `cache/public_weights/flexdepth_n_kitti/` | `/work/cache/public_weights/flexdepth_n_kitti` |
+| BoRe-Depth NYU / KITTI (official Google Drive) | `cache/public_weights/bore/{nyu,kitti}.ckpt` | `/work/cache/public_weights/bore/<dataset>.ckpt` |
+| ZipDepth-Base | in its submodule | `sota/zipdepth/checkpoints/zipdepth_base.pth` |
+
+Evaluate any of them (CPU is enough, no GPU booking):
 ```bash
-python main.py eval-public --model <model> --dataset <nyu|kitti> --weights weights/<name> --test-list splits/<test>.txt
+scripts/alcor/run.sh cpu <job> python3 main.py eval-public --model <model> --dataset <nyu|kitti> --weights <path> \
+    --test-list splits/<test list> [--image-size H W] --device cpu --out /work/runs/eval_public/<model>_<dataset>.json
 ```
+All loaders are strict and use `torch.load(weights_only=True)` only (`models/public_weights.py`).
