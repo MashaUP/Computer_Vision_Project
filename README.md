@@ -45,6 +45,8 @@ pip install '.[test]' && python -m pytest -q && python main.py check
 On the ALCOR machines everything runs in Podman: see [`docs/alcor.md`](docs/alcor.md).
 
 ## Status
+Detailed checklist: [`docs/experimental_plan.md`](docs/experimental_plan.md).
+
 | Step | State |
 |---|---|
 | Repository restructure, common model interface, protocol metrics, container and lab scripts | done |
