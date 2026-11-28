@@ -27,8 +27,8 @@ Tick a box in the same commit that completes the item. Protocol details: [`proto
 - [x] Save and check the NYU reference checkpoint (`weights/flexdepth_n_nyu/`)
 
 ## 2. Evaluation of the reference weights (no retraining)
-- [ ] **FlexDepth-Nano** (1.52 M)
-  - [ ] Evaluate on KITTI (652) with the released weights
+- [x] **FlexDepth-Nano** (1.52 M)
+  - [x] Evaluate on KITTI (652) with the released weights (HuggingFace `StarNew/flexdepth`, 192×640; `results/step2_public/`)
   - [x] Evaluate on NYU (654) with the step-1 checkpoint
 - [ ] **ZipDepth-Base** (6.79 M)
   - [ ] Load the released zero-shot weights (check 278/278 tensors)
@@ -36,7 +36,7 @@ Tick a box in the same commit that completes the item. Protocol details: [`proto
 - [x] **BoRe-Depth** (8.66 M)
   - [x] Download the NYU and KITTI weights from Drive and load them with *strict key checking* (`weights_only=True`, SHA-256 in `results/step2_public/README.md`)
   - [x] Evaluate on NYU (654) and KITTI (652) (256×320, 256×832; `results/step2_public/`)
-- [ ] Save all step-2 numbers (FlexDepth NYU included) in `results/` as JSON / CSV
+- [x] Save all step-2 numbers (FlexDepth NYU included) in `results/` as JSON / CSV (`results/step2_public/`)
 
 ## 3. LeJEPA SSL pre-training and decoder fine-tuning (3 seeds)
 
