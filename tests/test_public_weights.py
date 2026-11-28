@@ -97,6 +97,34 @@ def test_flexdepth_public_weights_roundtrip_and_strictness(tmp_path):
         load_public_weights(dst, bad_type)
 
 
+def test_flexdepth_drops_only_scalar_thop_buffers(tmp_path):
+    """The released KITTI weights carry thop ``total_ops`` / ``total_params`` buffers: dropped, nothing else is."""
+    src = _build("flexdepth", "n")
+    enc = {**src.encoder.state_dict(), "height": 192, "width": 640, "use_stereo": False}
+    dec = dict(src.decoder.state_dict())
+    for sd, names in ((enc, ("encoder.0.act", "encoder.10.m.0.ffn.0.act")), (dec, ("convs.0.act",))):
+        for n in names:
+            sd[f"{n}.total_ops"] = torch.zeros(1, dtype=torch.float64)
+            sd[f"{n}.total_params"] = torch.zeros(1, dtype=torch.float64)
+    ok = tmp_path / "thop"
+    ok.mkdir()
+    torch.save(enc, ok / "encoder.pth")
+    torch.save(dec, ok / "depth.pth")
+    dst = _build("flexdepth", "n")
+    meta = load_public_weights(dst, ok)
+    assert meta == {"height": 192, "width": 640, "use_stereo": False}
+    assert _state_equal(dst.encoder.state_dict(), src.encoder.state_dict())
+    assert _state_equal(dst.decoder.state_dict(), src.decoder.state_dict())
+
+    # a non-scalar tensor with the same suffix is not a profiler buffer: strict loading still fails
+    bad = tmp_path / "not_thop"
+    bad.mkdir()
+    torch.save({**enc, "encoder.0.act.total_ops": torch.zeros(3)}, bad / "encoder.pth")
+    torch.save(dec, bad / "depth.pth")
+    with pytest.raises(RuntimeError):
+        load_public_weights(_build("flexdepth", "n"), bad)
+
+
 def test_zipdepth_public_weights_roundtrip_and_strictness(tmp_path):
     src = _build("zipdepth", "base")
     raw_sd = {f"module._orig_mod.{k}": v for k, v in src.state_dict().items()}
