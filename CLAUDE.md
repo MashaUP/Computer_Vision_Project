@@ -16,7 +16,7 @@ experimental protocol in `docs/protocol.md`.
 - `python main.py eval-public --model flexdepth|zipdepth|bore --dataset nyu|kitti --weights <path> --test-list splits/nyu_labeled_test.txt`
 - FlexDepth on NYU (original trainer, needs CUDA + `pip install '.[flexdepth-train]'`):
   `python scripts/train_flexdepth_nyu.py --name flexdepth_n_nyu [-- <extra FlexDepth options>]`
-- ZipDepth pseudo-depth for `loss: zipdepth` (Depth Anything V2 Large, GPU, resumable; `--limit 200` to time it):
+- ZipDepth pseudo-depth for `loss: zipdepth` (Depth Anything V2 Large, GPU, resumable; `--limit 200` to time it; NYU ~2 frames/s on a 1080 Ti):
   `python scripts/make_pseudo_depth.py --dataset nyu|kitti --list splits/<dataset>_raw_triplets_train.txt`
 
 ## Hard rules
@@ -37,11 +37,22 @@ experimental protocol in `docs/protocol.md`.
 - `to_depth` uses min depth 0.1 m (Monodepth2 convention); `MIN_DEPTH=1e-3` is only for metrics and clamping.
 - Tests must run on CPU; add a test for any risky logic.
 
+## Status (28/11)
+- Split lists live in the data root (`<LG_DATA_ROOT>/splits/`, `/work/data/splits/` in the container), not in the repo;
+  `--list splits/...` is resolved against the data root.
+- FlexDepth-Nano retrained on NYU with `train_flexdepth_nyu.py` on the lab (50 epochs, `weights/flexdepth_n_nyu/`);
+  its test-654 numbers are not in `results/` yet.
+- Depth Anything V2 Large on the lab (1080 Ti, fp32): released weights load strictly; NYU 2.0 frames/s, 2.8 GB peak,
+  ~53 MB of PNG per 200 frames. NYU full run (24,863 triplets) launched 28/11; KITTI not measured yet.
+- KITTI: layout on ALCOR verified (151 drives, 47,889 frames, annotated GT on the same drives); `--make_splits` run on
+  28/11: 109 train / 14 val / 28 Eigen test drives, 27,154 train triplets, 652 test pairs; no test or val drive in any
+  path of the train lists.
+- NYU: 24,863 train triplets. `data/splits/` also holds `.bak` copies from 26/11 with 6 more lines, probably the lists
+  from before the `ppm_ok` fix (c68b153, truncated raw frames skipped): to confirm, then remove.
+
 ## Open items
-- `train_flexdepth_nyu.py`: GPU run and the COCO-pretrained weights path not yet exercised; the lab needs network for the
-  YOLO11 and ImageNet ResNet-18 (pose net) weights.
 - Step-3 loss: `photometric` (FlexDepth, BoRe) and `zipdepth` (ZipDepth) implemented; ZipDepth `cross_scale.low_to_high`
-  is trained with the decoder in both. Not yet run on GPU: strict loading of the released Depth Anything V2 weights,
-  memory and frames/s of `make_pseudo_depth.py` on the 1080 / 1080 Ti.
-- KITTI preparation: `data/download/download_kitti.py --make_splits` and `data.datasets.check_list` leak guards are implemented; zip layout on first ALCOR download still unverified.
+  is trained with the decoder in both. Not yet run as a training job on GPU.
+- Public-weight evaluation still to run: FlexDepth KITTI, ZipDepth NYU / KITTI, BoRe-Depth NYU / KITTI.
+- `piano_sperimentale_lejepa.pdf` still shows option A (photometric for all) for the step-3 loss.
 - `make_views` takes ~65% of a training step on CPU; not measured on GPU yet.

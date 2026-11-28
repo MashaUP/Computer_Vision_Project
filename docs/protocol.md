@@ -39,6 +39,15 @@ so LeJEPA gains are compared **within** each model, not across models.
 Totals: 12 pre-trainings (3 models x 2 variants x 2 datasets) and 54 decoder trainings
 (3 x 3 initialisations x 3 seeds x 2 datasets), plus FlexDepth on NYU and the public-weight evaluation.
 
+## Splits (lists in `<data root>/splits/`, generated on the lab)
+| Dataset | Train (raw triplets) | Validation | Test |
+|---|---|---|---|
+| NYU Depth V2 | 24,863 | ~5% of the non-test raw scenes (hash of the scene id) | 654 labelled frames |
+| KITTI | 27,154 (109 drives) | 14 drives (hash of the drive name): 1,595 triplets, 1,483 annotated frames | 652 Eigen pairs (28 drives, excluded entirely) |
+
+`data.datasets.check_list` rejects train lists that touch a test or validation scene / drive; on 28/11 the KITTI
+lists were also checked on every path of every line.
+
 ## Fairness rules
 - Same test sets (NYU 654, KITTI 652 annotated), same crops (Eigen / Garg) and depth caps (10 m / 80 m).
 - Metrics after median scaling and after scale-and-shift (on inverse depth): [`evaluation/metrics.py`](../evaluation/metrics.py).

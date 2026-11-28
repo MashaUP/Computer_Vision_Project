@@ -50,9 +50,13 @@ On the ALCOR machines everything runs in Podman: see [`docs/alcor.md`](docs/alco
 | Repository restructure, common model interface, protocol metrics, container and lab scripts | done |
 | LeJEPA classic / dense in one code path; phase-1 recipes reproduce the exam code exactly (`scripts/verify_phase1_equivalence.py`) | done |
 | One trainer for pre-training and frozen-encoder fine-tuning, with checkpoint + resume | done (step-3 loss: photometric for FlexDepth/BoRe, ZipDepthLoss on Depth Anything V2 pseudo-depth for ZipDepth) |
-| NYU complete download and labelled-frame extraction (`data/download/nyu.py`) | done, to run on the lab |
-| FlexDepth on NYU, original trainer (`scripts/train_flexdepth_nyu.py`, lists from `data.download.nyu triplets`) | script + CPU test done; GPU run on the lab pending |
-| Public-weight loaders (step 1), KITTI preparation, NYU raw depth alignment | next |
+| NYU complete download and labelled-frame extraction (`data/download/nyu.py`) | done on the lab (24,863 raw train triplets) |
+| FlexDepth on NYU, original trainer (`scripts/train_flexdepth_nyu.py`, lists from `data.download.nyu triplets`) | done on the lab (50 epochs, [`weights/flexdepth_n_nyu/`](weights/)); test numbers to add to `results/` |
+| Public-weight loaders, strict (`models/public_weights.py`, `main.py eval-public`) | done; evaluation of FlexDepth KITTI, ZipDepth and BoRe-Depth pending |
+| KITTI preparation (`data/download/download_kitti.py --make_splits`) | done on the lab (28/11): 27,154 train triplets, 652 Eigen test pairs, leak-checked |
+| Depth Anything V2 pseudo-depth for ZipDepth (`scripts/make_pseudo_depth.py`) | NYU running on the lab (28/11, ~2 frames/s on a 1080 Ti); KITTI next |
+| LeJEPA pre-trainings (12) and decoder trainings (54) | next |
+| NYU raw depth alignment | next |
 
 ## Running
 ```bash

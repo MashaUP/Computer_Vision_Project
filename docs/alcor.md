@@ -50,6 +50,18 @@ scripts/alcor/run.sh 2 dav2_nyu python3 scripts/make_pseudo_depth.py --dataset n
 ```
 The weights (1.34 GB) are downloaded on first use to `cache/dav2/depth_anything_v2_vitl.pth`. If Hugging Face
 is not reachable from the lab, download them elsewhere and copy them there with `scp`.
+`--list splits/...` is relative to the data root: the lists live in `/mnt/hdd2/<user>/data/splits/`.
+
+Measured on the Tower GTX (28/11, NYU, GPU 2 = 1080 Ti, fp32): Hugging Face reachable, 2.0 frames/s,
+2.8 GB GPU memory, ~53 MB of PNG per 200 frames, so ~3.4 h and ~6.6 GB for the 24,863 NYU triplets.
+KITTI frames are wider (375 x 1242): time it with `--limit 200` before the full run (27,154 triplets).
+
+## KITTI split lists (CPU, no booking)
+```bash
+scripts/alcor/run.sh cpu kitti_splits python3 -m data.download.download_kitti --make_splits
+```
+Writes the seven `kitti_*` lists to `data/splits/` (it overwrites existing ones). Run on 28/11: 109 train /
+14 val / 28 Eigen test drives, 27,154 train triplets, 652 test pairs.
 
 ## After a campaign
 ```bash
